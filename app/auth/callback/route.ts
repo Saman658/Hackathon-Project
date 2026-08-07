@@ -7,13 +7,15 @@ export async function GET(request: Request) {
 
   if (code) {
     const supabase = await createClient()
-    const { error } = await supabase.auth.exchangeCodeForSession(code)
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code)
 
-    if (!error) {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        return NextResponse.redirect(`${origin}/dashboard`)
-      }
+    if (error) {
+      console.error('Auth callback error:', error)
+      return NextResponse.redirect(`${origin}/`)
+    }
+
+    if (data?.user) {
+      return NextResponse.redirect(`${origin}/dashboard`)
     }
   }
 
