@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stopColor="#f8fafc" />
+      <stop offset="100%" stopColor="#e2e8f0" />
+    </linearGradient>
+    <linearGradient id="box" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stopColor="#f59e0b" />
+      <stop offset="100%" stopColor="#f97316" />
+    </linearGradient>
+  </defs>
+  <rect width="400" height="400" fill="url(#bg)" />
+  <g transform="translate(200, 200)">
+    <rect x="-70" y="-60" width="140" height="100" fill="url(#box)" rx="8" />
+    <rect x="-50" y="-80" width="100" height="30" fill="#fbbf24" rx="4" />
+    <text x="0" y="5" text-anchor="middle" fill="white" font-family="system-ui, sans-serif" font-size="14" font-weight="700">ADD-ON</text>
+    <text x="0" y="25" text-anchor="middle" fill="white" font-family="system-ui, sans-serif" font-size="12" opacity="0.9">PACK</text>
+    <circle cx="-40" cy="-40" r="6" fill="white" opacity="0.6" />
+    <circle cx="40" cy="-40" r="6" fill="white" opacity="0.6" />
+    <path d="M-30 50 L30 50" stroke="white" strokeWidth="3" opacity="0.4" strokeDasharray="8 4" />
+  </g>
+  <text x="200" y="340" text-anchor="middle" fill="#64748b" font-family="system-ui, sans-serif" font-size="16" font-weight="600">Add-on Pack</text>
+</svg>

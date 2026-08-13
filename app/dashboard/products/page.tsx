@@ -6,14 +6,7 @@ import { Header } from "@/components/layout/header"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-
-const products = [
-  { id: "1", name: "Premium Plan", sku: "PLAN-PRE", price: "$49.00", stock: "Unlimited", status: "Active" },
-  { id: "2", name: "Basic Plan", sku: "PLAN-BAS", price: "$19.00", stock: "Unlimited", status: "Active" },
-  { id: "3", name: "Enterprise Plan", sku: "PLAN-ENT", price: "$149.00", stock: "Unlimited", status: "Active" },
-  { id: "4", name: "Add-on Pack", sku: "ADD-001", price: "$9.00", stock: "500", status: "Active" },
-  { id: "5", name: "Legacy Support", sku: "SUP-OLD", price: "$29.00", stock: "0", status: "Discontinued" },
-]
+import { products } from "@/lib/data/products"
 
 export default function ProductsPage() {
   return (

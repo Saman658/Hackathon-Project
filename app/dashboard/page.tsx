@@ -9,6 +9,8 @@ import { ActivityList, defaultActivities } from "@/components/dashboard/activity
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { useAuth } from "@/components/providers/auth-provider"
+import { getProfile } from "@/lib/supabase/auth"
 
 const recentOrders = [
   { id: "#1247", customer: "Sarah Chen", product: "Premium Plan", amount: "$249.99", status: "Completed", date: "2 min ago" },
@@ -25,6 +27,17 @@ const statusStyles: Record<string, "success" | "warning" | "outline"> = {
 }
 
 export default function DashboardPage() {
+  const { user } = useAuth()
+  const [profile, setProfile] = React.useState<{ name?: string | null; business_name?: string | null; email?: string | null } | null>(null)
+
+  React.useEffect(() => {
+    const fetchProfile = async () => {
+      const p = await getProfile()
+      setProfile(p)
+    }
+    fetchProfile()
+  }, [])
+
   return (
     <div className="flex min-h-screen bg-background">
       <Sidebar />
@@ -32,6 +45,15 @@ export default function DashboardPage() {
         <Header />
         <main className="flex-1 p-6 lg:p-8 overflow-auto">
           <div className="max-w-7xl mx-auto space-y-8">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-2xl font-bold tracking-tight">Welcome{profile?.name ? `, ${profile.name}` : ""}</h1>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {profile?.business_name || "Here's what's happening with your business today."}
+                </p>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {defaultCards.map((card, i) => (
                 <AnalyticsCard key={i} {...card} />

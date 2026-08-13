@@ -88,6 +88,7 @@ export function LoginModal({ open, onOpenChange }: LoginModalProps) {
         return
       }
       onOpenChange(false)
+      window.location.href = "/dashboard"
     } catch (err) {
       console.error("signUp exception:", err)
       setError(err instanceof Error ? err.message : "An unexpected error occurred")

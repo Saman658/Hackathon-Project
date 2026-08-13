@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stopColor="#f8fafc" />
+      <stop offset="100%" stopColor="#e2e8f0" />
+    </linearGradient>
+    <linearGradient id="shirt" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stopColor="#3b82f6" />
+      <stop offset="100%" stopColor="#2563eb" />
+    </linearGradient>
+  </defs>
+  <rect width="400" height="400" fill="url(#bg)" />
+  <g transform="translate(200, 180)">
+    <path d="M-60 -120 L-40 -100 L-30 -60 L-20 0 L-30 80 L-50 120 L50 120 L30 80 L20 0 L30 -60 L40 -100 L60 -120 L40 -140 L0 -130 L-40 -140 Z" fill="url(#shirt)" />
+    <path d="M-40 -140 L0 -130 L40 -140 L30 -120 L-30 -120 Z" fill="#1d4ed8" />
+    <line x1="0" y1="-130" x2="0" y2="120" stroke="white" strokeWidth="2" opacity="0.3" />
+    <circle cx="-15" cy="-80" r="3" fill="white" opacity="0.8" />
+    <circle cx="-15" cy="-40" r="3" fill="white" opacity="0.8" />
+    <circle cx="-15" cy="0" r="3" fill="white" opacity="0.8" />
+    <circle cx="-15" cy="40" r="3" fill="white" opacity="0.8" />
+    <circle cx="-15" cy="80" r="3" fill="white" opacity="0.8" />
+  </g>
+  <text x="200" y="360" text-anchor="middle" fill="#64748b" font-family="system-ui, sans-serif" font-size="16" font-weight="600">Dress Shirt</text>
+</svg>

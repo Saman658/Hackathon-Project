@@ -3,14 +3,18 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { createClient } from "@/lib/supabase/client"
 import { cn } from "../ui/button"
 import { Button } from "../ui/button"
 import { Logo } from "../ui/logo"
 import {
   LayoutDashboard,
   Users,
+  DollarSign,
   ShoppingCart,
   Package,
+  Brain,
+  AlertTriangle,
   Settings,
   HelpCircle,
   ChevronLeft,
@@ -21,11 +25,15 @@ import {
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/dashboard/customers", label: "Customers", icon: Users },
+  { href: "/dashboard/revenue", label: "Revenue", icon: DollarSign },
   { href: "/dashboard/orders", label: "Orders", icon: ShoppingCart },
   { href: "/dashboard/products", label: "Products", icon: Package },
+  { href: "/dashboard/problems", label: "Problems", icon: AlertTriangle },
+  { href: "/dashboard/ai-insights", label: "AI Insights", icon: Brain },
 ]
 
 const bottomNavItems = [
+
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
   { href: "/dashboard/help", label: "Help", icon: HelpCircle },
 ]
@@ -116,16 +124,20 @@ function SidebarInner({ className }: SidebarProps) {
       </nav>
 
       <div className="p-3 border-t border-border">
-        <Link
-          href="/"
+        <button
+          onClick={async () => {
+            const supabase = createClient()
+            await supabase.auth.signOut()
+            window.location.href = "/"
+          }}
           className={cn(
-            "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-border-light hover:text-foreground transition-all duration-200",
+            "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-border-light hover:text-foreground transition-all duration-200 w-full",
             collapsed && "justify-center px-2"
           )}
         >
           <X className="h-5 w-5 shrink-0" />
           {!collapsed && <span>Log out</span>}
-        </Link>
+        </button>
       </div>
     </aside>
   )

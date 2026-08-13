@@ -43,6 +43,9 @@ function NavbarInner({ onLoginClick, className }: NavbarProps) {
           <Link href="#pricing" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
             Pricing
           </Link>
+          <Link href="/store" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+            Store
+          </Link>
           <Link href="#testimonials" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
             Testimonials
           </Link>

@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { usePathname } from "next/navigation"
+import { useRouter } from "next/navigation"
 import { cn } from "../ui/button"
 import { Button } from "../ui/button"
 import { Avatar } from "../ui/avatar"
@@ -17,6 +18,8 @@ import {
   Menu,
 } from "lucide-react"
 import { Sidebar } from "./sidebar"
+import { useAuth } from "@/components/providers/auth-provider"
+import { ProfileModal } from "@/components/auth/profile-modal"
 
 const notifications = [
   { id: 1, title: "New order received", time: "2 min ago", read: false },
@@ -31,8 +34,11 @@ interface HeaderProps {
 
 function HeaderInner({ className }: HeaderProps) {
   const [sidebarOpen, setSidebarOpen] = React.useState(false)
+  const [profileModalOpen, setProfileModalOpen] = React.useState(false)
   const pathname = usePathname()
+  const router = useRouter()
   const unreadCount = notifications.filter((n) => !n.read).length
+  const { user, profile, signOut, refreshProfile } = useAuth()
 
   const getPageTitle = () => {
     if (pathname === "/dashboard") return "Dashboard"
@@ -41,6 +47,21 @@ function HeaderInner({ className }: HeaderProps) {
     if (pathname === "/dashboard/products") return "Products"
     if (pathname === "/dashboard/problems") return "Problems"
     return "Dashboard"
+  }
+
+  const displayName = profile?.name || user?.email?.split("@")[0] || "User"
+  const displayEmail = profile?.email || user?.email || ""
+  const displayBusiness = profile?.business_name || ""
+  const initials = displayName
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2)
+
+  const handleLogout = async () => {
+    await signOut()
+    window.location.href = "/"
   }
 
   return (
@@ -104,10 +125,12 @@ function HeaderInner({ className }: HeaderProps) {
           <Dropdown
             trigger={
               <div className="flex items-center gap-2.5 cursor-pointer hover:bg-border-light rounded-xl px-2 py-1.5 transition-colors">
-                <Avatar src="" alt="User" fallback="JD" size="sm" />
+                <Avatar src="" alt={displayName} fallback={initials} size="sm" />
                 <div className="hidden md:block text-left">
-                  <p className="text-sm font-medium leading-none">John Doe</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Admin</p>
+                  <p className="text-sm font-medium leading-none">{displayName}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {displayBusiness || displayEmail}
+                  </p>
                 </div>
                 <ChevronDown className="h-4 w-4 text-muted-foreground hidden md:block" />
               </div>
@@ -115,13 +138,16 @@ function HeaderInner({ className }: HeaderProps) {
             align="right"
           >
             <div className="px-4 py-2 border-b border-border">
-              <p className="text-sm font-semibold">John Doe</p>
-              <p className="text-xs text-muted-foreground">john@nexus.com</p>
+              <p className="text-sm font-semibold">{displayName}</p>
+              <p className="text-xs text-muted-foreground">{displayEmail}</p>
+              {displayBusiness && (
+                <p className="text-xs text-muted-foreground">{displayBusiness}</p>
+              )}
             </div>
-            <DropdownItem>Profile</DropdownItem>
-            <DropdownItem>Settings</DropdownItem>
+            <DropdownItem onClick={() => setProfileModalOpen(true)}>Profile</DropdownItem>
+            <DropdownItem onClick={() => router.push("/dashboard/settings")}>Settings</DropdownItem>
             <DropdownSeparator />
-            <DropdownItem destructive>Log out</DropdownItem>
+            <DropdownItem destructive onClick={handleLogout}>Log out</DropdownItem>
           </Dropdown>
         </div>
       </header>
@@ -134,6 +160,15 @@ function HeaderInner({ className }: HeaderProps) {
           </div>
         </div>
       )}
+
+      <ProfileModal
+        open={profileModalOpen}
+        onOpenChange={setProfileModalOpen}
+        defaultName={profile?.name || ""}
+        defaultBusinessName={profile?.business_name || ""}
+        defaultEmail={profile?.email || user?.email || ""}
+        onSaved={refreshProfile}
+      />
     </>
   )
 }
