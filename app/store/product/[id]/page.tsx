@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import type { Product } from "@/lib/data/products"
 import { publicProducts, parseStock, fetchProductFromSupabase } from "@/lib/data/products"
 import Link from "next/link"
-import { ArrowLeft, ShoppingCart, Zap } from "lucide-react"
+import { ArrowLeft, ShoppingCart, Zap, Minus, Plus } from "lucide-react"
 import { useCart } from "@/components/store/cart-context"
 import { mockStore } from "@/lib/data/stores"
 
@@ -138,20 +138,41 @@ export default function ProductDetailPage() {
                   <p className="text-sm text-muted-foreground leading-relaxed">{product.description}</p>
                 </div>
 
-                <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-border mt-auto">
-                  <Button variant="outline" className="w-full" onClick={() => addToCart({
-                    productId: product.id,
-                    name: product.name,
-                    price: product.price,
-                    image: product.image,
-                  })} disabled={isOutOfStock}>
-                    <ShoppingCart className="mr-2 h-4 w-4" />
-                    <span className="whitespace-nowrap">{isOutOfStock ? "Out of Stock" : "Add to Cart"}</span>
-                  </Button>
-                  <Button className="w-full" disabled={isOutOfStock}>
-                    <Zap className="mr-2 h-4 w-4" />
-                    <span className="whitespace-nowrap">Order Now</span>
-                  </Button>
+                <div className="flex flex-col sm:flex-row flex-wrap gap-3 pt-4 border-t border-border mt-auto">
+                  <div className="flex items-center gap-3 shrink-0">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => {}}
+                      disabled
+                      aria-label="Quantity"
+                    >
+                      <Minus className="h-4 w-4" />
+                    </Button>
+                    <span className="w-12 text-center text-base font-medium">1</span>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => {}}
+                      disabled
+                      aria-label="Quantity"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-3 flex-1 min-w-0 w-full sm:w-auto">
+                    <Button variant="outline" className="w-full sm:flex-1 min-w-0 whitespace-nowrap" onClick={() => addToCart({
+                      productId: product.id,
+                      name: product.name,
+                      price: product.price,
+                      image: product.image,
+                    })} disabled={isOutOfStock}>
+                      <span className="whitespace-nowrap">{isOutOfStock ? "Out of Stock" : "Add to Cart"}</span>
+                    </Button>
+                    <Button className="w-full sm:flex-1 min-w-0 whitespace-nowrap" disabled={isOutOfStock}>
+                      <span className="whitespace-nowrap">Order Now</span>
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </div>

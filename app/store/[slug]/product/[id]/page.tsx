@@ -165,8 +165,8 @@ export default function ProductDetailPage() {
                 </div>
 
                 <div className="mt-auto pt-8 border-t border-border">
-                  <div className="flex flex-col sm:flex-row items-center gap-4">
-                    <div className="flex items-center gap-3">
+                  <div className="flex flex-col sm:flex-row flex-wrap items-center gap-3">
+                    <div className="flex items-center gap-3 shrink-0">
                       <Button
                         variant="outline"
                         size="icon"
@@ -188,18 +188,16 @@ export default function ProductDetailPage() {
                       </Button>
                     </div>
 
-                    <div className="flex flex-col sm:flex-row gap-3 w-full">
+                    <div className="flex flex-col sm:flex-row gap-3 flex-1 min-w-0 w-full sm:w-auto">
                       <Button
                         variant="outline"
-                        className="w-full"
+                        className="w-full sm:flex-1 min-w-0 whitespace-nowrap"
                         onClick={handleAddToCart}
                         disabled={!canAddToCart}
                       >
-                        <ShoppingCart className="mr-2 h-4 w-4" />
                         <span className="whitespace-nowrap">{added ? "Added to Cart" : isOutOfStock ? "Out of Stock" : isInactive ? "Unavailable" : "Add to Cart"}</span>
                       </Button>
-                      <Button className="w-full" disabled={isOutOfStock || isInactive}>
-                        <Zap className="mr-2 h-4 w-4" />
+                      <Button className="w-full sm:flex-1 min-w-0 whitespace-nowrap" disabled={isOutOfStock || isInactive}>
                         <span className="whitespace-nowrap">Order Now</span>
                       </Button>
                     </div>
