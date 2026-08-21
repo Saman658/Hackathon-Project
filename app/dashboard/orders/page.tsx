@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/components/providers/auth-provider"
-import { fetchOrdersFromSupabase } from "@/lib/data/orders"
+import { fetchOrdersFromSupabase, Order } from "@/lib/data/orders"
 
 const statusStyles: Record<string, "success" | "warning" | "outline" | "default"> = {
   Completed: "success",
@@ -49,20 +49,112 @@ function mapOrderToRow(order: {
   }
 }
 
+function escapeCsvField(value: string): string {
+  if (value.includes(",") || value.includes('"') || value.includes("\n")) {
+    return `"${value.replace(/"/g, '""')}"`
+  }
+  return value
+}
+
+function buildCsv(fullOrders: Order[]): string {
+  const header = [
+    "Order ID",
+    "Customer Name",
+    "Customer Email",
+    "Customer Phone",
+    "Shipping Address",
+    "City",
+    "Postal Code",
+    "Order Date",
+    "Status",
+    "Subtotal",
+    "Shipping",
+    "Total",
+    "Items",
+  ]
+
+  const rows = fullOrders.map((order) => {
+    const itemsDescription = order.items
+      .map((item) => `${item.name} x${item.quantity} (@$${Number(item.price).toFixed(2)})`)
+      .join("; ")
+
+    return [
+      order.id,
+      order.customer.fullName,
+      order.customer.email,
+      order.customer.phone,
+      `${order.customer.address}, ${order.customer.city}, ${order.customer.postalCode}`,
+      order.customer.city,
+      order.customer.postalCode,
+      new Date(order.createdAt).toISOString(),
+      order.status,
+      order.subtotal.toFixed(2),
+      order.shipping.toFixed(2),
+      order.total.toFixed(2),
+      itemsDescription,
+    ]
+      .map((field) => escapeCsvField(String(field)))
+      .join(",")
+  })
+
+  return [header.join(","), ...rows].join("\r\n")
+}
+
 export default function OrdersPage() {
   const { user } = useAuth()
   const [orders, setOrders] = React.useState<ReturnType<typeof mapOrderToRow>[]>([])
+  const [fullOrders, setFullOrders] = React.useState<Order[]>([])
   const [loading, setLoading] = React.useState(true)
+  const [exporting, setExporting] = React.useState(false)
+  const [message, setMessage] = React.useState<{ type: "success" | "error" | "info"; text: string } | null>(null)
+
+  const clearMessage = React.useCallback(() => setMessage(null), [])
 
   React.useEffect(() => {
     async function load() {
       if (!user) return
       const data = await fetchOrdersFromSupabase(user.id)
+      setFullOrders(data)
       setOrders(data.map(mapOrderToRow))
       setLoading(false)
     }
     load()
   }, [user])
+
+  async function handleExport() {
+    if (exporting) return
+
+    if (fullOrders.length === 0) {
+      setMessage({ type: "info", text: "There are no orders to export." })
+      return
+    }
+
+    setExporting(true)
+    clearMessage()
+
+    try {
+      const csv = buildCsv(fullOrders)
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
+      const url = URL.createObjectURL(blob)
+
+      const today = new Date().toISOString().split("T")[0]
+      const filename = `orders-${today}.csv`
+
+      const link = document.createElement("a")
+      link.href = url
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+
+      setMessage({ type: "success", text: `Exported ${fullOrders.length} order${fullOrders.length === 1 ? "" : "s"} to ${filename}.` })
+    } catch {
+      setMessage({ type: "error", text: "Failed to export orders. Please try again." })
+    } finally {
+      setExporting(false)
+    }
+  }
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -76,8 +168,25 @@ export default function OrdersPage() {
                 <h1 className="text-2xl font-bold tracking-tight">Orders</h1>
                 <p className="text-sm text-muted-foreground mt-1">Track and manage customer orders.</p>
               </div>
-              <Button>Export Orders</Button>
+              <Button onClick={handleExport} disabled={exporting}>
+                {exporting ? "Exporting..." : "Export Orders"}
+              </Button>
             </div>
+
+            {message && (
+              <div
+                role="alert"
+                className={`rounded-xl border p-4 text-sm ${
+                  message.type === "success"
+                    ? "bg-success-bg border-success/20 text-success"
+                    : message.type === "error"
+                    ? "bg-error-bg border-error/20 text-error"
+                    : "bg-surface border-border text-muted-foreground"
+                }`}
+              >
+                {message.text}
+              </div>
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
               <Card>
