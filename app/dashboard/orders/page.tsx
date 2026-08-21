@@ -7,16 +7,8 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-
-const orders = [
-  { id: "#1247", customer: "Sarah Chen", items: 3, total: "$249.99", status: "Completed", date: "Aug 3, 2025" },
-  { id: "#1246", customer: "Marcus Johnson", items: 1, total: "$49.00", status: "Processing", date: "Aug 3, 2025" },
-  { id: "#1245", customer: "Elena Rodriguez", items: 1, total: "$149.00", status: "Completed", date: "Aug 2, 2025" },
-  { id: "#1244", customer: "David Kim", items: 2, total: "$199.98", status: "Pending", date: "Aug 2, 2025" },
-  { id: "#1243", customer: "Lisa Wang", items: 1, total: "$49.00", status: "Completed", date: "Aug 1, 2025" },
-  { id: "#1242", customer: "James Wilson", items: 4, total: "$349.96", status: "Shipped", date: "Aug 1, 2025" },
-  { id: "#1241", customer: "Anna Lee", items: 2, total: "$129.98", status: "Completed", date: "Jul 31, 2025" },
-]
+import { useAuth } from "@/components/providers/auth-provider"
+import { fetchOrdersFromSupabase } from "@/lib/data/orders"
 
 const statusStyles: Record<string, "success" | "warning" | "outline" | "default"> = {
   Completed: "success",
@@ -25,7 +17,53 @@ const statusStyles: Record<string, "success" | "warning" | "outline" | "default"
   Shipped: "default",
 }
 
+function formatOrderDate(iso: string): string {
+  try {
+    const date = new Date(iso)
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    })
+  } catch {
+    return iso
+  }
+}
+
+function mapOrderToRow(order: {
+  id: string
+  customer: { fullName: string }
+  items: { quantity: number }[]
+  total: number
+  status: string
+  createdAt: string
+}) {
+  const itemCount = order.items.reduce((sum, item) => sum + item.quantity, 0)
+  return {
+    id: order.id,
+    customer: order.customer.fullName,
+    items: itemCount,
+    total: `$${order.total.toFixed(2)}`,
+    status: order.status,
+    date: formatOrderDate(order.createdAt),
+  }
+}
+
 export default function OrdersPage() {
+  const { user } = useAuth()
+  const [orders, setOrders] = React.useState<ReturnType<typeof mapOrderToRow>[]>([])
+  const [loading, setLoading] = React.useState(true)
+
+  React.useEffect(() => {
+    async function load() {
+      if (!user) return
+      const data = await fetchOrdersFromSupabase(user.id)
+      setOrders(data.map(mapOrderToRow))
+      setLoading(false)
+    }
+    load()
+  }, [user])
+
   return (
     <div className="flex min-h-screen bg-background">
       <Sidebar />
@@ -45,25 +83,25 @@ export default function OrdersPage() {
               <Card>
                 <CardContent className="p-6">
                   <p className="text-sm text-muted-foreground mb-1">Total Orders</p>
-                  <p className="text-2xl font-bold">1,245</p>
+                  <p className="text-2xl font-bold">{orders.length}</p>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="p-6">
                   <p className="text-sm text-muted-foreground mb-1">Completed</p>
-                  <p className="text-2xl font-bold text-success">892</p>
+                  <p className="text-2xl font-bold text-success">{orders.filter((o) => o.status === "Completed").length}</p>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="p-6">
                   <p className="text-sm text-muted-foreground mb-1">Processing</p>
-                  <p className="text-2xl font-bold text-warning">187</p>
+                  <p className="text-2xl font-bold text-warning">{orders.filter((o) => o.status === "Processing").length}</p>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="p-6">
                   <p className="text-sm text-muted-foreground mb-1">Pending</p>
-                  <p className="text-2xl font-bold text-muted-foreground">166</p>
+                  <p className="text-2xl font-bold text-muted-foreground">{orders.filter((o) => o.status === "Pending").length}</p>
                 </CardContent>
               </Card>
             </div>
@@ -81,18 +119,32 @@ export default function OrdersPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {orders.map((order) => (
-                    <TableRow key={order.id}>
-                      <TableCell className="font-medium">{order.id}</TableCell>
-                      <TableCell>{order.customer}</TableCell>
-                      <TableCell>{order.items}</TableCell>
-                      <TableCell>{order.total}</TableCell>
-                      <TableCell>
-                        <Badge variant={statusStyles[order.status]}>{order.status}</Badge>
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                        Loading orders...
                       </TableCell>
-                      <TableCell className="text-muted-foreground">{order.date}</TableCell>
                     </TableRow>
-                  ))}
+                  ) : orders.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                        No orders found.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    orders.map((order) => (
+                      <TableRow key={order.id}>
+                        <TableCell className="font-medium">{order.id}</TableCell>
+                        <TableCell>{order.customer}</TableCell>
+                        <TableCell>{order.items}</TableCell>
+                        <TableCell>{order.total}</TableCell>
+                        <TableCell>
+                          <Badge variant={statusStyles[order.status]}>{order.status}</Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">{order.date}</TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </div>

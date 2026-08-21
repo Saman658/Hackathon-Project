@@ -34,7 +34,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = React.useState<{ id: string; email?: string } | null>(null)
   const [profile, setProfile] = React.useState<UserProfile | null>(null)
   const [loading, setLoading] = React.useState(true)
-  const [initialized, setInitialized] = React.useState(false)
+  const initializedRef = React.useRef(false)
 
   const refreshProfile = async () => {
     const currentUser = await getCurrentUser()
@@ -54,7 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const init = async () => {
       await refreshProfile()
       if (mounted) setLoading(false)
-      setInitialized(true)
+      initializedRef.current = true
     }
 
     init()
@@ -72,14 +72,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (mounted) setProfile(null)
       }
       
-      if (!initialized) setLoading(false)
+      if (!initializedRef.current) setLoading(false)
     })
 
     return () => {
       mounted = false
       subscription.unsubscribe()
     }
-  }, [initialized])
+  }, [])
 
   const handleSignOut = async () => {
     await signOut()

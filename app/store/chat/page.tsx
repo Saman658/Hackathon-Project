@@ -2,8 +2,9 @@
 
 import * as React from "react"
 import { useSearchParams } from "next/navigation"
-import { Navbar } from "@/components/layout/navbar"
-import { Footer } from "@/components/layout/footer"
+import { StoreNavbar } from "@/components/store/store-navbar"
+import { StoreFooter } from "@/components/store/store-footer"
+import { mockStore } from "@/lib/data/stores"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -51,7 +52,7 @@ function getProductResponse(query: string, highlightProductId?: string): string 
   return "I can help with product availability, pricing, SKUs, and stock. Try asking: What products are available? What is the price of Premium Plan?"
 }
 
-export default function ChatPage() {
+function ChatContent() {
   const searchParams = useSearchParams()
   const highlightProductId = searchParams.get("product") || undefined
   const [messages, setMessages] = React.useState<Message[]>([
@@ -100,70 +101,80 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <Navbar onLoginClick={() => {}} />
-      <main className="max-w-3xl mx-auto px-6 py-16">
-        <div className="mb-6">
-          <Link href="/store" className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Store
-          </Link>
-        </div>
+    <>
+      <div className="mb-6">
+        <Link href="/store" className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back to Store
+        </Link>
+      </div>
 
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <MessageSquare className="h-5 w-5 text-muted-foreground" />
-              <div>
-                <CardTitle>Store Assistant</CardTitle>
-                <CardDescription>Ask about products, prices, and availability.</CardDescription>
-              </div>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <MessageSquare className="h-5 w-5 text-muted-foreground" />
+            <div>
+              <CardTitle>Store Assistant</CardTitle>
+              <CardDescription>Ask about products, prices, and availability.</CardDescription>
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4 h-[400px] overflow-y-auto rounded-xl border border-border bg-surface p-4">
-              {messages.map((message, index) => (
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4 h-[400px] overflow-y-auto rounded-xl border border-border bg-surface p-4">
+            {messages.map((message, index) => (
+              <div
+                key={index}
+                className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
+              >
                 <div
-                  key={index}
-                  className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
+                  className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm ${
+                    message.role === "user"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-border-light text-foreground"
+                  }`}
                 >
-                  <div
-                    className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm ${
-                      message.role === "user"
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-border-light text-foreground"
-                    }`}
-                  >
-                    <p className="whitespace-pre-line">{message.content}</p>
-                  </div>
+                  <p className="whitespace-pre-line">{message.content}</p>
                 </div>
-              ))}
-              {loading && (
-                <div className="flex justify-start">
-                  <div className="max-w-[80%] rounded-2xl px-4 py-2.5 text-sm bg-border-light text-foreground">
-                    Thinking...
-                  </div>
+              </div>
+            ))}
+            {loading && (
+              <div className="flex justify-start">
+                <div className="max-w-[80%] rounded-2xl px-4 py-2.5 text-sm bg-border-light text-foreground">
+                  Thinking...
                 </div>
-              )}
-              <div ref={messagesEndRef} />
-            </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
 
-            <form onSubmit={handleSend} className="mt-4 flex gap-3">
-              <Input
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Ask about our products..."
-                className="flex-1"
-                disabled={loading}
-              />
-              <Button type="submit" disabled={loading || !input.trim()}>
-                Send
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+          <form onSubmit={handleSend} className="mt-4 flex gap-3">
+            <Input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Ask about our products..."
+              className="flex-1"
+              disabled={loading}
+            />
+            <Button type="submit" disabled={loading || !input.trim()}>
+              Send
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+    </>
+  )
+}
+
+export default function ChatPage() {
+  return (
+    <div className="min-h-screen bg-background">
+      <StoreNavbar store={mockStore} />
+      <main className="max-w-3xl mx-auto px-6 py-16">
+        <React.Suspense fallback={<div className="text-center text-muted-foreground py-12">Loading chat...</div>}>
+          <ChatContent />
+        </React.Suspense>
       </main>
-      <Footer />
+      <StoreFooter store={mockStore} />
     </div>
   )
 }

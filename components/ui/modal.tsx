@@ -7,9 +7,10 @@ interface ModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   children: React.ReactNode
+  maxWidth?: string
 }
 
-function Modal({ open, onOpenChange, children }: ModalProps) {
+function Modal({ open, onOpenChange, children, maxWidth = "max-w-md" }: ModalProps) {
   React.useEffect(() => {
     if (open) {
       document.body.style.overflow = "hidden"
@@ -29,7 +30,7 @@ function Modal({ open, onOpenChange, children }: ModalProps) {
         className="absolute inset-0 bg-foreground/20 backdrop-blur-sm"
         onClick={() => onOpenChange(false)}
       />
-      <div className="relative z-50 w-full max-w-md mx-4 animate-scale-in">
+      <div className={`relative z-50 w-full ${maxWidth} mx-4 animate-scale-in max-h-[90vh] overflow-hidden flex flex-col`}>
         {children}
       </div>
     </div>
@@ -42,7 +43,7 @@ function ModalContent({ className, ...props }: ModalContentProps) {
   return (
     <div
       className={cn(
-        "w-full rounded-3xl bg-surface border border-border shadow-2xl",
+        "w-full rounded-3xl bg-surface border border-border shadow-2xl flex flex-col flex-1 min-h-0",
         className
       )}
       {...props}
@@ -75,7 +76,7 @@ function ModalTitle({ className, ...props }: ModalTitleProps) {
 type ModalBodyProps = React.HTMLAttributes<HTMLDivElement>
 
 function ModalBody({ className, ...props }: ModalBodyProps) {
-  return <div className={cn("px-6 pb-6", className)} {...props} />
+  return <div className={cn("px-6 pb-6 overflow-y-auto", className)} {...props} />
 }
 
 type ModalFooterProps = React.HTMLAttributes<HTMLDivElement>

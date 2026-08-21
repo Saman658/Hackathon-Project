@@ -9,20 +9,41 @@ create table if not exists public.profiles (
 
 alter table public.profiles enable row level security;
 
+
+-- Users can view their own profile
+drop policy if exists "Users can view their own profile"
+on public.profiles;
+
 create policy "Users can view their own profile"
-  on public.profiles for select
-  using (auth.uid() = id);
+on public.profiles
+for select
+using (auth.uid() = id);
+
+
+-- Users can insert their own profile
+drop policy if exists "Users can insert their own profile"
+on public.profiles;
 
 create policy "Users can insert their own profile"
-  on public.profiles for insert
-  with check (auth.uid() = id);
+on public.profiles
+for insert
+with check (auth.uid() = id);
+
+
+-- Users can update their own profile
+drop policy if exists "Users can update their own profile"
+on public.profiles;
 
 create policy "Users can update their own profile"
-  on public.profiles for update
-  using (auth.uid() = id);
+on public.profiles
+for update
+using (auth.uid() = id);
 
+
+-- Function for automatically creating a profile
 create or replace function public.handle_new_user()
-returns trigger as $$
+returns trigger
+as $$
 begin
   insert into public.profiles (id, name, business_name, email)
   values (
@@ -32,10 +53,16 @@ begin
     new.email
   )
   on conflict (id) do nothing;
+
   return new;
 end;
 $$ language plpgsql security definer;
 
+
+-- Trigger
+drop trigger if exists on_auth_user_created on auth.users;
+
 create trigger on_auth_user_created
-  after insert on auth.users
-  for each row execute procedure public.handle_new_user();
+after insert on auth.users
+for each row
+execute procedure public.handle_new_user();

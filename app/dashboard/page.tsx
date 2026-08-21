@@ -9,16 +9,12 @@ import { ActivityList, defaultActivities } from "@/components/dashboard/activity
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Modal, ModalContent, ModalHeader, ModalTitle, ModalBody, ModalFooter } from "@/components/ui/modal"
 import { useAuth } from "@/components/providers/auth-provider"
-import { getProfile } from "@/lib/supabase/auth"
-
-const recentOrders = [
-  { id: "#1247", customer: "Sarah Chen", product: "Premium Plan", amount: "$249.99", status: "Completed", date: "2 min ago" },
-  { id: "#1246", customer: "Marcus Johnson", product: "Basic Plan", amount: "$49.00", status: "Processing", date: "15 min ago" },
-  { id: "#1245", customer: "Elena Rodriguez", product: "Enterprise Plan", amount: "$149.00", status: "Completed", date: "1 hour ago" },
-  { id: "#1244", customer: "David Kim", product: "Premium Plan", amount: "$249.99", status: "Pending", date: "2 hours ago" },
-  { id: "#1243", customer: "Lisa Wang", product: "Basic Plan", amount: "$49.00", status: "Completed", date: "3 hours ago" },
-]
+import { useStores } from "@/lib/stores-context"
+import { Store, mockStore } from "@/lib/data/stores"
+import { fetchOrdersFromSupabase } from "@/lib/data/orders"
 
 const statusStyles: Record<string, "success" | "warning" | "outline"> = {
   Completed: "success",
@@ -26,17 +22,131 @@ const statusStyles: Record<string, "success" | "warning" | "outline"> = {
   Pending: "outline",
 }
 
+function formatCurrency(value: number): string {
+  return `$${value.toFixed(2)}`
+}
+
 export default function DashboardPage() {
-  const { user } = useAuth()
-  const [profile, setProfile] = React.useState<{ name?: string | null; business_name?: string | null; email?: string | null } | null>(null)
+  const { profile, user } = useAuth()
+  const { addStore } = useStores()
+  const [modalOpen, setModalOpen] = React.useState(false)
+  const [successStore, setSuccessStore] = React.useState<Store | null>(null)
+  const [revenue, setRevenue] = React.useState(0)
+  const [totalOrders, setTotalOrders] = React.useState(0)
+  const [recentOrders, setRecentOrders] = React.useState<{ id: string; customer: string; product: string; amount: string; status: string; date: string }[]>([])
 
   React.useEffect(() => {
-    const fetchProfile = async () => {
-      const p = await getProfile()
-      setProfile(p)
+    async function load() {
+      if (!user) return
+      const data = await fetchOrdersFromSupabase(user.id)
+      const completed = data.filter((o) => o.status === "Completed")
+      setRevenue(completed.reduce((sum, order) => sum + order.total, 0))
+      setTotalOrders(completed.length)
+
+      const mapped = data.slice(0, 5).map((order) => ({
+        id: order.id,
+        customer: order.customer.fullName,
+        product: order.items[0]?.name || "Multiple items",
+        amount: `$${order.total.toFixed(2)}`,
+        status: order.status,
+        date: new Date(order.createdAt).toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        }),
+      }))
+      setRecentOrders(mapped)
     }
-    fetchProfile()
-  }, [])
+    load()
+  }, [user])
+
+  const cards = [
+    {
+      title: "Total Revenue",
+      value: formatCurrency(revenue),
+      change: revenue > 0 ? "+100%" : "0%",
+      trend: revenue > 0 ? "up" as const : "neutral" as const,
+      icon: defaultCards[0].icon,
+    },
+    {
+      title: "Active Customers",
+      value: defaultCards[1].value,
+      change: defaultCards[1].change,
+      trend: defaultCards[1].trend,
+      icon: defaultCards[1].icon,
+    },
+    {
+      title: "Total Orders",
+      value: totalOrders.toString(),
+      change: totalOrders > 0 ? "+100%" : "0%",
+      trend: totalOrders > 0 ? "up" as const : "neutral" as const,
+      icon: defaultCards[2].icon,
+    },
+    {
+      title: "Conversion Rate",
+      value: defaultCards[3].value,
+      change: defaultCards[3].change,
+      trend: defaultCards[3].trend,
+      icon: defaultCards[3].icon,
+    },
+  ]
+
+  const [name, setName] = React.useState("")
+  const [description, setDescription] = React.useState("")
+  const [logo, setLogo] = React.useState("")
+  const [slug, setSlug] = React.useState("")
+  const [heroTitle, setHeroTitle] = React.useState("")
+  const [heroDescription, setHeroDescription] = React.useState("")
+
+  const [errors, setErrors] = React.useState<{ name?: string; slug?: string; heroTitle?: string; heroDescription?: string }>({})
+
+  function resetForm() {
+    setName("")
+    setDescription("")
+    setLogo("")
+    setSlug("")
+    setHeroTitle("")
+    setHeroDescription("")
+    setErrors({})
+    setSuccessStore(null)
+  }
+
+  function handleOpenChange(open: boolean) {
+    if (!open) {
+      resetForm()
+    }
+    setModalOpen(open)
+  }
+
+  function autoSlug(value: string) {
+    const parts = value.toLowerCase().trim().replace(/[^\w\s-]/g, "").replace(/[\s_-]+/g, "-").replace(/^-+|-+$/g, "").split("-")
+    return parts.filter(Boolean).join("-")
+  }
+
+  function validate() {
+    const newErrors: { name?: string; slug?: string; heroTitle?: string; heroDescription?: string } = {}
+    if (!name.trim()) newErrors.name = "Store name is required"
+    if (!slug.trim()) newErrors.slug = "Store slug is required"
+    if (!heroTitle.trim()) newErrors.heroTitle = "Hero title is required"
+    if (!heroDescription.trim()) newErrors.heroDescription = "Hero description is required"
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
+  function handleCreate() {
+    if (!validate()) return
+    const created = addStore({
+      name: name.trim(),
+      description: description.trim(),
+      logo: logo.trim(),
+      slug: slug.trim(),
+      heroTitle: heroTitle.trim(),
+      heroDescription: heroDescription.trim(),
+    })
+    setSuccessStore(created)
+  }
+
+  const isSuccess = successStore !== null
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -52,10 +162,11 @@ export default function DashboardPage() {
                   {profile?.business_name || "Here's what's happening with your business today."}
                 </p>
               </div>
+              <Button onClick={() => { resetForm(); setModalOpen(true) }}>Create Store</Button>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {defaultCards.map((card, i) => (
+              {cards.map((card, i) => (
                 <AnalyticsCard key={i} {...card} />
               ))}
             </div>
@@ -113,6 +224,106 @@ export default function DashboardPage() {
           </div>
         </main>
       </div>
+
+      <Modal open={modalOpen} onOpenChange={handleOpenChange} maxWidth="max-w-2xl">
+        <ModalContent className="max-w-2xl">
+          <ModalHeader>
+            <ModalTitle>{isSuccess ? "Store Created" : "Create Store"}</ModalTitle>
+          </ModalHeader>
+          {isSuccess ? (
+            <div className="flex flex-col items-center text-center py-6">
+              <div className="h-16 w-16 rounded-full bg-success-bg text-success flex items-center justify-center mb-4">
+                <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <p className="text-base font-medium mb-1">Your store has been created successfully.</p>
+              <p className="text-sm text-muted-foreground mb-6">You can continue setting up your dashboard or preview your new store.</p>
+              <div className="rounded-2xl border border-border bg-surface p-4 w-full flex items-center gap-4">
+                <div className="h-12 w-12 rounded-xl border border-border overflow-hidden bg-border-light shrink-0">
+                  {successStore.logo ? (
+                    <img src={successStore.logo} alt={successStore.name} className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="h-full w-full flex items-center justify-center text-muted-foreground text-xs">No logo</div>
+                  )}
+                </div>
+                <div className="text-left min-w-0">
+                  <p className="font-semibold truncate">{successStore.name}</p>
+                  <p className="text-sm text-muted-foreground truncate">/{successStore.slug}</p>
+                </div>
+              </div>
+              <div className="flex items-center justify-end gap-3 mt-6 w-full">
+                <Button onClick={() => handleOpenChange(false)}>Done</Button>
+              </div>
+            </div>
+          ) : (
+            <form onSubmit={(e) => { e.preventDefault(); handleCreate() }} className="flex flex-col">
+              <ModalBody className="space-y-4 max-h-[60vh] overflow-y-auto">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-foreground mb-1.5 block">Store Name <span className="text-error">*</span></label>
+                    <Input value={name} onChange={(e) => { setName(e.target.value); if (!slug) setSlug(autoSlug(e.target.value)) }} placeholder="e.g. Fatima Fashion" error={errors.name} />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-foreground mb-1.5 block">Store Slug <span className="text-error">*</span></label>
+                    <Input value={slug} onChange={(e) => setSlug(autoSlug(e.target.value))} placeholder="e.g. fatima-fashion" error={errors.slug} />
+                    <p className="text-xs text-muted-foreground mt-1.5">Used in your store URL.</p>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-foreground mb-1.5 block">Store Description</label>
+                  <textarea
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Briefly describe your store"
+                    rows={3}
+                    className="flex w-full rounded-xl border border-border bg-transparent px-4 py-3 text-base placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-all duration-200 resize-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-foreground mb-1.5 block">Logo / Image URL</label>
+                  <Input value={logo} onChange={(e) => setLogo(e.target.value)} placeholder="https://example.com/logo.png" />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-foreground mb-1.5 block">Hero Title <span className="text-error">*</span></label>
+                  <Input value={heroTitle} onChange={(e) => setHeroTitle(e.target.value)} placeholder="e.g. Summer Collection 2026" error={errors.heroTitle} />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-foreground mb-1.5 block">Hero Description <span className="text-error">*</span></label>
+                  <textarea
+                    value={heroDescription}
+                    onChange={(e) => setHeroDescription(e.target.value)}
+                    placeholder="A short description shown on your store hero"
+                    rows={3}
+                    className="flex w-full rounded-xl border border-border bg-transparent px-4 py-3 text-base placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-all duration-200 resize-none"
+                  />
+                </div>
+
+                {(name || heroTitle || heroDescription || logo) && (
+                  <div className="rounded-2xl border border-border bg-surface p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Preview</p>
+                    <div className="rounded-xl border border-border overflow-hidden bg-border-light">
+                      {logo ? (
+                        <img src={logo} alt="Store logo preview" className="h-40 w-full object-cover" />
+                      ) : (
+                        <div className="h-40 w-full flex items-center justify-center text-muted-foreground text-sm">No logo provided</div>
+                      )}
+                      <div className="p-4">
+                        <p className="text-lg font-semibold">{heroTitle || "Your Hero Title"}</p>
+                        <p className="text-sm text-muted-foreground mt-1">{heroDescription || "Your hero description will appear here."}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="secondary" type="button" onClick={() => handleOpenChange(false)}>Cancel</Button>
+                <Button type="submit">Create Store</Button>
+              </ModalFooter>
+            </form>
+          )}
+        </ModalContent>
+      </Modal>
     </div>
   )
 }
