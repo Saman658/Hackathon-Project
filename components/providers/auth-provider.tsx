@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { createClient } from "@/lib/supabase/client"
-import { getCurrentUser, getProfile, upsertProfile, signOut } from "@/lib/supabase/auth"
+import { getCurrentUser, getProfile, signOut } from "@/lib/supabase/auth"
 
 interface UserProfile {
   id: string
@@ -72,7 +72,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (mounted) setProfile(null)
       }
       
-      if (!initializedRef.current) setLoading(false)
+      setLoading(false)
     })
 
     return () => {

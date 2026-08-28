@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Modal, ModalContent, ModalHeader, ModalTitle, ModalBody, ModalFooter } from "@/components/ui/modal"
+import { Modal, ModalContent, ModalHeader, ModalTitle, ModalBody } from "@/components/ui/modal"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { upsertProfile } from "@/lib/supabase/auth"
@@ -32,6 +32,7 @@ export function ProfileModal({
   const [error, setError] = React.useState("")
   const [success, setSuccess] = React.useState(false)
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   React.useEffect(() => {
     if (open) {
       setName(defaultName)
@@ -40,6 +41,7 @@ export function ProfileModal({
       setSuccess(false)
     }
   }, [open, defaultName, defaultBusinessName])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

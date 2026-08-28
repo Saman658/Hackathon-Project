@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
-import { ArrowRight, ShoppingCart } from "lucide-react"
+import { ShoppingCart } from "lucide-react"
 import { cn } from "@/components/ui/button"
 import type { Product } from "@/lib/data/products"
 import { parseStock } from "@/lib/data/products"
@@ -18,7 +18,7 @@ interface ProductCardProps {
 function ProductCardInner({ product, onAddToCart, className, storeSlug }: ProductCardProps) {
   const stock = parseStock(product.stock)
   const isOutOfStock = stock === 0
-  const displayStock = isOutOfStock ? "Out of Stock" : (stock === Infinity ? product.stock : "In Stock")
+  const displayStock = isOutOfStock ? "Out of Stock" : "In Stock"
   const productHref = storeSlug ? `/store/${storeSlug}/product/${product.id}` : `/store/product/${product.id}`
 
   return (
@@ -49,8 +49,8 @@ function ProductCardInner({ product, onAddToCart, className, storeSlug }: Produc
         </div>
         <CardDescription>SKU: {product.sku}</CardDescription>
       </CardHeader>
-      <CardContent className="flex-1 flex flex-col">
-        <div className="mt-auto space-y-4">
+      <CardContent className="flex flex-col space-y-4">
+        <div>
           <div className="flex items-end justify-between">
             <div>
               <p className="text-sm text-muted-foreground">Price</p>
@@ -62,15 +62,14 @@ function ProductCardInner({ product, onAddToCart, className, storeSlug }: Produc
             </div>
           </div>
           {product.description && (
-            <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2">
+            <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2 mt-3">
               {product.description}
             </p>
           )}
-          <div className="flex gap-2">
+          <div className="flex gap-2 mt-3">
             <Link href={productHref} className="block flex-1">
               <Button className="w-full" disabled={isOutOfStock}>
-                {isOutOfStock ? "Out of Stock" : "View Product"}
-                {!isOutOfStock && <ArrowRight className="ml-2 h-4 w-4" />}
+                {isOutOfStock ? "Out of Stock" : "Buy Now"}
               </Button>
             </Link>
             {onAddToCart && !isOutOfStock && (

@@ -6,7 +6,6 @@ import { StoreNavbar } from "@/components/store/store-navbar"
 import { StoreFooter } from "@/components/store/store-footer"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { getStoreBySlug } from "@/lib/data/stores"
 import { fetchOrderFromSupabase, safeParsePrice } from "@/lib/data/orders"
 import type { Order } from "@/lib/data/orders"
 import { CheckCircle2 } from "lucide-react"
@@ -25,81 +24,87 @@ function formatDate(value: string): string {
   }
 }
 
+interface StoreData {
+  store: {
+    id: string
+    name: string
+    slug: string
+    description: string
+    logo: string
+    heroTitle: string
+    heroDescription: string
+  }
+}
+
 export default function OrderSuccessPage() {
   const params = useParams()
   const searchParams = useSearchParams()
   const slug = params.slug as string
   const orderId = searchParams.get("orderId")
+  const token = searchParams.get("token") ?? undefined
 
-  const store = getStoreBySlug(slug)
-
-  if (!store) {
-    notFound()
-  }
-
+  const [data, setData] = React.useState<StoreData | null>(null)
+  const [loadingStore, setLoadingStore] = React.useState(true)
   const [order, setOrder] = React.useState<Order | null>(null)
-  const [loading, setLoading] = React.useState(true)
+  const [loadingOrder, setLoadingOrder] = React.useState(true)
 
   React.useEffect(() => {
-    async function load() {
+    async function loadStore() {
+      try {
+        const res = await fetch(`/api/store/${slug}`)
+        if (!res.ok) {
+          if (res.status === 404) {
+            notFound()
+            return
+          }
+        }
+        const json = await res.json()
+        setData(json)
+      } catch {
+        // ignore
+      } finally {
+        setLoadingStore(false)
+      }
+    }
+    loadStore()
+  }, [slug])
+
+  React.useEffect(() => {
+    async function loadOrder() {
       if (!orderId) {
-        setLoading(false)
+        setLoadingOrder(false)
         return
       }
-      const data = await fetchOrderFromSupabase(orderId)
+      const data = await fetchOrderFromSupabase(orderId, token)
       setOrder(data)
-      setLoading(false)
+      setLoadingOrder(false)
     }
-    load()
-  }, [orderId])
+    loadOrder()
+  }, [orderId, token])
 
-  if (loading) {
+  if (loadingStore || loadingOrder) {
     return (
-      <div className="min-h-screen bg-background">
-        <StoreNavbar store={store} />
-        <main className="max-w-7xl mx-auto px-6 py-16">
-          <div className="max-w-2xl mx-auto">
-            <Card>
-              <CardContent className="p-8 text-center">
-                <h1 className="text-2xl font-bold tracking-tight mb-2">Loading...</h1>
-              </CardContent>
-            </Card>
-          </div>
-        </main>
-        <StoreFooter store={store} />
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-muted-foreground">Loading...</p>
       </div>
     )
   }
 
-  if (!order) {
+  if (!data || !order) {
     return (
-      <div className="min-h-screen bg-background">
-        <StoreNavbar store={store} />
-        <main className="max-w-7xl mx-auto px-6 py-16">
-          <div className="max-w-2xl mx-auto">
-            <Card>
-              <CardContent className="p-8 text-center">
-                <h1 className="text-2xl font-bold tracking-tight mb-2">Order not found</h1>
-                <p className="text-sm text-muted-foreground mb-6">
-                  We couldn&apos;t find this order. It may have been removed or the link is invalid.
-                </p>
-                <Link href={`/store/${slug}`}>
-                  <Button>Continue Shopping</Button>
-                </Link>
-              </CardContent>
-            </Card>
-          </div>
-        </main>
-        <StoreFooter store={store} />
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-error">Order not found</p>
       </div>
     )
   }
+
+  const store = data.store
 
   return (
     <div className="min-h-screen bg-background">
       <StoreNavbar store={store} />
       <main className="max-w-7xl mx-auto px-6 py-16">
-        <div className="max-w-3xl mx-auto">
+        <div className="max-w-2xl mx-auto">
           <Card>
             <CardContent className="p-8 text-center">
               <div className="h-16 w-16 rounded-full bg-success-bg text-success flex items-center justify-center mx-auto mb-4">

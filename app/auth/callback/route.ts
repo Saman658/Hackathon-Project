@@ -11,13 +11,13 @@ export async function GET(request: Request) {
 
     if (error) {
       console.error('Auth callback error:', error)
-      return NextResponse.redirect(`${origin}/`)
+      return NextResponse.redirect(`${origin}/login?error=auth_callback_failed`)
     }
 
-    if (data?.user) {
+    if (data?.session?.user) {
       return NextResponse.redirect(`${origin}/dashboard`)
     }
   }
 
-  return NextResponse.redirect(`${origin}/`)
+  return NextResponse.redirect(`${origin}/login?error=no_session`)
 }

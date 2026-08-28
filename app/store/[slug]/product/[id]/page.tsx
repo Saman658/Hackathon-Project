@@ -1,71 +1,101 @@
 "use client"
 
 import * as React from "react"
-import { useParams, notFound } from "next/navigation"
+
+import { useParams, useRouter, notFound } from "next/navigation"
 import { StoreNavbar } from "@/components/store/store-navbar"
 import { StoreFooter } from "@/components/store/store-footer"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import type { Product } from "@/lib/data/products"
-import { publicProducts, parseStock, fetchProductFromSupabase } from "@/lib/data/products"
-import { getStoreBySlug } from "@/lib/data/stores"
+import { parseStock } from "@/lib/data/products"
 import { useCart } from "@/components/store/cart-context"
-import { ArrowLeft, Minus, Plus, ShoppingCart, Zap } from "lucide-react"
+import { ArrowLeft, Minus, Plus } from "lucide-react"
 import Link from "next/link"
+
+interface ProductData {
+  product: Product
+  store: {
+    id: string
+    name: string
+    slug: string
+    description: string
+    logo: string
+    heroTitle: string
+    heroDescription: string
+  }
+}
 
 export default function ProductDetailPage() {
   const params = useParams()
+  const router = useRouter()
   const slug = params.slug as string
   const productId = params.id as string
   const { addToCart, items } = useCart()
 
-  const store = getStoreBySlug(slug)
-  const [product, setProduct] = React.useState<Product | undefined>(
-    publicProducts.find((p) => p.id === productId)
-  )
-  const [productLoading, setProductLoading] = React.useState(false)
+  const [data, setData] = React.useState<ProductData | null>(null)
+  const [loading, setLoading] = React.useState(true)
+  const [error, setError] = React.useState<string | null>(null)
+
   const [quantity, setQuantity] = React.useState(1)
   const [added, setAdded] = React.useState(false)
   const [selectedImage, setSelectedImage] = React.useState<string | null>(null)
 
+  React.useEffect(() => {
+    async function load() {
+      try {
+        const res = await fetch(`/api/store/products/${productId}?storeSlug=${encodeURIComponent(slug)}`)
+        if (!res.ok) {
+          if (res.status === 404) {
+            notFound()
+            return
+          }
+          throw new Error("Failed to load product")
+        }
+        const json = await res.json()
+        
+        if (json.store.slug !== slug) {
+          notFound()
+          return
+        }
+        
+        setData(json)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load product")
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
+  }, [productId, slug])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-muted-foreground">Loading...</p>
+      </div>
+    )
+  }
+
+  if (error || !data) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-error">{error || "Product not found"}</p>
+      </div>
+    )
+  }
+
+  const store = data.store
+  const product = data.product
+
   const stock = parseStock(product?.stock)
   const isOutOfStock = stock === 0
   const isInactive = product ? !product.active : false
-  const belongsToStore = product ? product.storeId === store?.id : false
-  const canAddToCart = !isOutOfStock && !isInactive && belongsToStore
+  const canAddToCart = !isOutOfStock && !isInactive
 
   const cartItem = items.find((item) => item.productId === product?.id)
   const currentCartQuantity = cartItem?.quantity || 0
-
-  React.useEffect(() => {
-    async function load() {
-      if (!productId) return
-      const found = publicProducts.find((p) => p.id === productId)
-      if (found) {
-        setProduct(found)
-        return
-      }
-      setProductLoading(true)
-      const supabaseProduct = await fetchProductFromSupabase(productId)
-      setProduct(supabaseProduct || undefined)
-      setProductLoading(false)
-    }
-    load()
-  }, [productId])
-
-  React.useEffect(() => {
-    if (!store || !product || !belongsToStore) {
-      notFound()
-    }
-  }, [store, product, belongsToStore])
-
-  if (!store || !product || !belongsToStore) {
-    return null
-  }
-
-  const allImages = [product.image, ...(product.images || [])].filter(Boolean) as string[]
-  const mainImage = selectedImage || product.image || allImages[0] || ""
 
   function increment() {
     setQuantity((prev) => Math.min(prev + 1, stock || 1))
@@ -92,6 +122,25 @@ export default function ProductDetailPage() {
     setTimeout(() => setAdded(false), 2000)
   }
 
+  function handleOrderNow() {
+    if (!canAddToCart || !product) return
+    const remainingStock = (stock || 0) - currentCartQuantity
+    const addQuantity = Math.min(quantity, Math.max(remainingStock, 0))
+    if (addQuantity <= 0) return
+
+    addToCart({
+      productId: product.id,
+      name: product.name,
+      price: product.price,
+      image: product.image,
+    }, addQuantity)
+
+    router.push(`/store/${slug}/checkout`)
+  }
+
+  const allImages = [product.image, ...(product.images || [])].filter(Boolean) as string[]
+  const mainImage = selectedImage || product.image || allImages[0] || ""
+
   return (
     <div className="min-h-screen bg-background">
       <StoreNavbar store={store} />
@@ -114,7 +163,7 @@ export default function ProductDetailPage() {
                     className="h-full w-full object-cover"
                   />
                 ) : (
-                  <div className="h-full w-full flex items-center justify-center text-muted-foreground">
+                  <div className="flex h-full w-full items-center justify-center text-muted-foreground">
                     No image
                   </div>
                 )}
@@ -197,7 +246,7 @@ export default function ProductDetailPage() {
                       >
                         <span className="whitespace-nowrap">{added ? "Added to Cart" : isOutOfStock ? "Out of Stock" : isInactive ? "Unavailable" : "Add to Cart"}</span>
                       </Button>
-                      <Button className="w-full sm:flex-1 min-w-0 whitespace-nowrap" disabled={isOutOfStock || isInactive}>
+                      <Button className="w-full sm:flex-1 min-w-0 whitespace-nowrap" onClick={handleOrderNow} disabled={!canAddToCart}>
                         <span className="whitespace-nowrap">Order Now</span>
                       </Button>
                     </div>

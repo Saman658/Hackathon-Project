@@ -5,6 +5,7 @@ import { Logo } from "../ui/logo"
 interface StoreFooterProps {
   store?: {
     name: string
+    slug?: string
     description?: string
   }
   className?: string
@@ -23,7 +24,7 @@ function StoreFooterInner({ store, className }: StoreFooterProps) {
       <div className="max-w-7xl mx-auto px-6 py-16">
         <div className="grid grid-cols-2 md:grid-cols-5 gap-8">
           <div className="col-span-2">
-            <Link href="/" className="flex items-center gap-2.5 mb-4">
+            <Link href={`/store/${store?.slug || ""}`} className="flex items-center gap-2.5 mb-4">
               <Logo size={36} />
               <span className="font-semibold text-lg tracking-tight">{store?.name || "Store"}</span>
             </Link>

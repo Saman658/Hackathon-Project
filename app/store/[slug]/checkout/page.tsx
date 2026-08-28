@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+
 import { useParams, notFound, useRouter } from "next/navigation"
 import { StoreNavbar } from "@/components/store/store-navbar"
 import { StoreFooter } from "@/components/store/store-footer"
@@ -8,13 +9,24 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import type { Product } from "@/lib/data/products"
-import { publicProducts, parseStock, fetchProductsFromSupabase } from "@/lib/data/products"
-import type { Order } from "@/lib/data/orders"
+import { parseStock } from "@/lib/data/products"
 import { createOrderInSupabase } from "@/lib/data/orders"
-import { getStoreBySlug } from "@/lib/data/stores"
 import { useCart } from "@/components/store/cart-context"
 import { ArrowLeft, CreditCard } from "lucide-react"
 import Link from "next/link"
+
+interface StoreData {
+  store: {
+    id: string
+    name: string
+    slug: string
+    description: string
+    logo: string
+    heroTitle: string
+    heroDescription: string
+  }
+  products: Product[]
+}
 
 export default function CheckoutPage() {
   const params = useParams()
@@ -22,7 +34,9 @@ export default function CheckoutPage() {
   const slug = params.slug as string
   const { items, cartCount, clearCart } = useCart()
 
-  const store = getStoreBySlug(slug)
+  const [data, setData] = React.useState<StoreData | null>(null)
+  const [loading, setLoading] = React.useState(true)
+  const [error, setError] = React.useState<string | null>(null)
 
   const [fullName, setFullName] = React.useState("")
   const [email, setEmail] = React.useState("")
@@ -43,25 +57,46 @@ export default function CheckoutPage() {
 
   const [submitting, setSubmitting] = React.useState(false)
 
-  if (!store) {
-    notFound()
-    return null
-  }
-
-  const storeId = store.id
-
-  const [products, setProducts] = React.useState<Product[]>(publicProducts)
-
   React.useEffect(() => {
     async function load() {
-      const data = await fetchProductsFromSupabase()
-      const filtered = data.filter((p) => p.storeId === storeId && p.active)
-      if (filtered.length > 0) {
-        setProducts(filtered)
+      try {
+        const res = await fetch(`/api/store/${slug}`)
+        if (!res.ok) {
+          if (res.status === 404) {
+            notFound()
+            return
+          }
+          throw new Error("Failed to load store")
+        }
+        const json = await res.json()
+        setData(json)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load store")
+      } finally {
+        setLoading(false)
       }
     }
     load()
-  }, [storeId])
+  }, [slug])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-muted-foreground">Loading...</p>
+      </div>
+    )
+  }
+
+  if (error || !data) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-error">{error || "Store not found"}</p>
+      </div>
+    )
+  }
+
+  const store = data.store
+  const products = data.products
 
   const validatedItems = items
     .map((item) => {
@@ -116,7 +151,7 @@ export default function CheckoutPage() {
 
     try {
       const order = await createOrderInSupabase({
-        storeId,
+        storeId: store.id,
         customer: {
           fullName: fullName.trim(),
           email: email.trim(),
@@ -138,7 +173,9 @@ export default function CheckoutPage() {
       })
 
       clearCart()
-      router.push(`/store/${slug}/order-success?orderId=${order.id}`)
+      router.push(
+        `/store/${slug}/order-success?orderId=${order.id}&token=${order.accessToken}`
+      )
     } catch (error: unknown) {
       const err = error as { message?: string; details?: string; hint?: string; code?: string }
       console.error("Failed to place order:", {
@@ -280,3 +317,6 @@ export default function CheckoutPage() {
     </div>
   )
 }
+
+
+

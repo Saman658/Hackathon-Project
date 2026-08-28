@@ -1,18 +1,16 @@
 "use client"
 
 import * as React from "react"
-import { useRouter } from "next/navigation"
 import { Sidebar } from "@/components/layout/sidebar"
 import { Header } from "@/components/layout/header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useAuth } from "@/components/providers/auth-provider"
-import { upsertProfile, updatePassword, updateEmail, signOut } from "@/lib/supabase/auth"
+import { upsertProfile, updatePasswordWithCurrent, updateEmail, signOut } from "@/lib/supabase/auth"
 
 export default function SettingsPage() {
   const { user, profile, refreshProfile } = useAuth()
-  const router = useRouter()
   
   const [name, setName] = React.useState("")
   const [businessName, setBusinessName] = React.useState("")
@@ -26,6 +24,7 @@ export default function SettingsPage() {
   const [emailLoading, setEmailLoading] = React.useState(false)
   const [message, setMessage] = React.useState<{ type: "success" | "error"; text: string } | null>(null)
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   React.useEffect(() => {
     if (profile) {
       setName(profile.name || "")
@@ -33,6 +32,7 @@ export default function SettingsPage() {
       setEmail(profile.email || user?.email || "")
     }
   }, [profile, user])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const handleProfileUpdate = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -67,7 +67,7 @@ export default function SettingsPage() {
     }
     
     try {
-      await updatePassword(newPassword)
+      await updatePasswordWithCurrent(currentPassword, newPassword)
       setCurrentPassword("")
       setNewPassword("")
       setConfirmPassword("")

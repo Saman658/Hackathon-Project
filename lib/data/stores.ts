@@ -1,3 +1,5 @@
+import { createClient } from "@/lib/supabase/client"
+
 export type Store = {
   id: string
   name: string
@@ -6,22 +8,89 @@ export type Store = {
   logo: string
   heroTitle: string
   heroDescription: string
+  userId?: string
+  updatedAt?: string
 }
 
-export const mockStore: Store = {
-  id: "nexus",
-  name: "Nexus Store",
-  slug: "nexus-store",
-  description: "Browse our plans and add-ons designed to help your business grow.",
-  logo: "",
-  heroTitle: "Nexus Store",
-  heroDescription: "Browse our plans and add-ons designed to help your business grow.",
+export interface DatabaseStore {
+  id: string
+  user_id: string
+  name: string
+  slug: string
+  description: string | null
+  logo: string | null
+  hero_title: string
+  hero_description: string
+  created_at: string
+  updated_at: string
 }
 
-export const stores: Store[] = [mockStore]
+export async function getStoresFromSupabase(userId?: string): Promise<Store[]> {
+  const supabase = createClient()
+  let query = supabase.from("stores").select("*").order("created_at", { ascending: true })
 
-export function getStoreBySlug(slug: string): Store | undefined {
-  return stores.find((store) => store.slug === slug)
+  if (userId) {
+    query = query.eq("user_id", userId)
+  }
+
+  const { data, error } = await query
+
+  if (error || !data) return []
+
+  return data.map((row: DatabaseStore) => ({
+    id: row.id,
+    name: row.name,
+    slug: row.slug,
+    description: row.description || "",
+    logo: row.logo || "",
+    heroTitle: row.hero_title || "",
+    heroDescription: row.hero_description || "",
+    userId: row.user_id,
+  }))
+}
+
+export async function getStoreBySlug(slug: string): Promise<Store | undefined> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from("stores")
+    .select("*")
+    .eq("slug", slug)
+    .single()
+
+  if (error || !data) return undefined
+
+  return {
+    id: data.id,
+    name: data.name,
+    slug: data.slug,
+    description: data.description || "",
+    logo: data.logo || "",
+    heroTitle: data.hero_title || "",
+    heroDescription: data.hero_description || "",
+    userId: data.user_id,
+  }
+}
+
+export async function getStoreById(id: string): Promise<Store | undefined> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from("stores")
+    .select("*")
+    .eq("id", id)
+    .single()
+
+  if (error || !data) return undefined
+
+  return {
+    id: data.id,
+    name: data.name,
+    slug: data.slug,
+    description: data.description || "",
+    logo: data.logo || "",
+    heroTitle: data.hero_title || "",
+    heroDescription: data.hero_description || "",
+    userId: data.user_id,
+  }
 }
 
 export function generateStoreId(): string {

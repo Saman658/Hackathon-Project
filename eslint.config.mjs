@@ -5,6 +5,16 @@ import nextTs from "eslint-config-next/typescript";
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
+  {
+    ignores: [
+      "analyze-images.cjs",
+      "analyze-layout.cjs",
+      "analyze-layout2.cjs",
+      "resize-categories.cjs",
+      "split-reference.cjs",
+      "test-rls2.mjs",
+    ],
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:

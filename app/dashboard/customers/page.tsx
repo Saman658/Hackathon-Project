@@ -37,10 +37,7 @@ export default function CustomersPage() {
   const isAdmin = profile?.is_admin === true
 
   React.useEffect(() => {
-    if (!isAdmin) {
-      setLoading(false)
-      return
-    }
+    if (!isAdmin) return
 
     const fetchProfiles = async () => {
       setLoading(true)

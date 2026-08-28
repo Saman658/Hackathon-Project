@@ -10,8 +10,8 @@ import { Input } from "@/components/ui/input"
 import { Modal, ModalContent, ModalHeader, ModalTitle, ModalBody, ModalFooter } from "@/components/ui/modal"
 import { EmptyState } from "@/components/ui/empty-state"
 import type { Product } from "@/lib/data/products"
-import { toProduct, toDatabaseProduct, addPublicProduct, updatePublicProduct, removePublicProduct, publicProducts } from "@/lib/data/products"
-import { stores, mockStore } from "@/lib/data/stores"
+import { toProduct, toDatabaseProduct } from "@/lib/data/products"
+import { getStoresFromSupabase } from "@/lib/data/stores"
 import { Pencil, Trash2 } from "lucide-react"
 import { useAuth } from "@/components/providers/auth-provider"
 import { createClient } from "@/lib/supabase/client"
@@ -55,8 +55,9 @@ export default function ProductsPage() {
   const [image, setImage] = React.useState<string | null>(null)
   const [images, setImages] = React.useState<string[]>([])
   const [status, setStatus] = React.useState("Active")
-  const [storeId, setStoreId] = React.useState(mockStore.id)
+  const [storeId, setStoreId] = React.useState("")
   const [active, setActive] = React.useState(true)
+  const [userStores, setUserStores] = React.useState<{ id: string; name: string; slug: string }[]>([])
 
   const [errors, setErrors] = React.useState<{ name?: string; price?: string; stock?: string }>({})
 
@@ -72,29 +73,63 @@ export default function ProductsPage() {
   const loadProducts = React.useCallback(async () => {
     if (!user) return
     const supabase = createClient()
-    const { data, error } = await supabase
+    let query = supabase
       .from("products")
       .select("*")
       .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
+
+    if (storeId) {
+      query = query.eq("store_id", storeId)
+    }
+
+    const { data, error } = await query.order("created_at", { ascending: false })
 
     if (error) {
       setError(error.message)
     } else if (data) {
       const mapped = data.map(toProduct)
       setProducts(mapped)
-      if (mapped.length > 0) {
-        publicProducts.length = 0
-        publicProducts.push(...mapped)
-      }
       setError(null)
     }
     setLoading(false)
+  }, [user, storeId])
+
+  const loadStores = React.useCallback(async () => {
+    if (!user) return
+    const allStores = await getStoresFromSupabase(user.id)
+    const myStores = allStores.filter((s) => s.userId === user.id)
+    setUserStores(myStores.map((s) => ({ id: s.id, name: s.name, slug: s.slug })))
+    setStoreId((prev) => {
+      if (myStores.length > 0 && !prev) {
+        return myStores[0].id
+      }
+      return prev
+    })
   }, [user])
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   React.useEffect(() => {
+    if (!user) {
+      setProducts([])
+      setUserStores([])
+      setStoreId("")
+      setLoading(false)
+      return
+    }
     loadProducts()
-  }, [loadProducts])
+  }, [loadProducts, user])
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  /* eslint-disable react-hooks/set-state-in-effect */
+  React.useEffect(() => {
+    if (!user) {
+      setUserStores([])
+      setStoreId("")
+      return
+    }
+    loadStores()
+  }, [loadStores, user])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   function loadForm(product?: Product) {
     if (product) {
@@ -105,7 +140,7 @@ export default function ProductsPage() {
       setImage(product.image)
       setImages(product.images || [])
       setStatus(product.status)
-      setStoreId(product.storeId || mockStore.id)
+      setStoreId(product.storeId || (userStores[0]?.id || ""))
       setActive(product.active)
     } else {
       setName("")
@@ -115,7 +150,7 @@ export default function ProductsPage() {
       setImage(null)
       setImages([])
       setStatus("Active")
-      setStoreId(mockStore.id)
+      setStoreId(userStores[0]?.id || "")
       setActive(true)
     }
     setErrors({})
@@ -157,7 +192,6 @@ export default function ProductsPage() {
     }
 
     setProducts((prev) => prev.filter((p) => p.id !== deleteProductId))
-    removePublicProduct(deleteProductId)
     setDeleteProductId(null)
     setDeleteModalOpen(false)
     setDeleting(false)
@@ -189,6 +223,7 @@ export default function ProductsPage() {
     const dbProduct = toDatabaseProduct({
       ...(editingProduct || {}),
       user_id: user.id,
+      store_id: storeId,
       name: name.trim(),
       description: description.trim(),
       price: price.trim(),
@@ -201,7 +236,7 @@ export default function ProductsPage() {
       const base = toProduct(db)
       return {
         ...base,
-        storeId,
+        storeId: db.store_id || base.storeId,
         active,
         images,
       }
@@ -219,7 +254,6 @@ export default function ProductsPage() {
       if (!error && data) {
         const updated = buildProduct(data as DatabaseProduct)
         setProducts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)))
-        updatePublicProduct(updated)
       }
     } else {
       const { data, error } = await supabase
@@ -232,7 +266,6 @@ export default function ProductsPage() {
         const created = buildProduct(data as DatabaseProduct)
         setProducts((prev) => [created, ...prev])
         setSearchQuery("")
-        addPublicProduct(created)
       }
     }
 
@@ -418,7 +451,7 @@ export default function ProductsPage() {
                     onChange={(e) => setStoreId(e.target.value)}
                     className="flex w-full rounded-xl border border-border bg-transparent h-11 px-4 text-base focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-all duration-200"
                   >
-                    {stores.map((store) => (
+                    {userStores.map((store) => (
                       <option key={store.id} value={store.id}>{store.name}</option>
                     ))}
                   </select>
@@ -485,3 +518,5 @@ export default function ProductsPage() {
     </div>
   )
 }
+
+

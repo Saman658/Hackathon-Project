@@ -12,11 +12,13 @@ export default function DashboardLayout({
   const { profile, loading, refreshProfile } = useAuth()
   const [showProfileModal, setShowProfileModal] = React.useState(false)
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   React.useEffect(() => {
     if (!loading && profile && !profile.name) {
       setShowProfileModal(true)
     }
   }, [loading, profile])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   return (
     <div className="flex min-h-screen">
@@ -24,6 +26,8 @@ export default function DashboardLayout({
       <ProfileModal 
         open={showProfileModal} 
         onOpenChange={setShowProfileModal}
+        defaultName={profile?.name || ""}
+        defaultBusinessName={profile?.business_name || ""}
         title="Complete Your Profile"
         onSaved={refreshProfile}
       />

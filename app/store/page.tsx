@@ -4,29 +4,45 @@ import * as React from "react"
 
 import { StoreNavbar } from "@/components/store/store-navbar"
 import { StoreHero } from "@/components/store/store-hero"
+import { CategoryGrid } from "@/components/store/category-grid"
 import { ProductGrid } from "@/components/store/product-grid"
 import { StoreFooter } from "@/components/store/store-footer"
 import type { Product } from "@/lib/data/products"
-import { publicProducts, fetchProductsFromSupabase } from "@/lib/data/products"
-import { mockStore } from "@/lib/data/stores"
 import { useCart } from "@/components/store/cart-context"
+import { useAuth } from "@/components/providers/auth-provider"
+import { useSearchParams } from "next/navigation"
 
-export default function StorePage() {
+interface StoreData {
+  store: {
+    id: string
+    name: string
+    slug: string
+    description: string
+    logo: string
+    heroTitle: string
+    heroDescription: string
+    updatedAt: string
+  }
+  products: Product[]
+}
+
+function StorePageClient({ data }: { data: StoreData }) {
   const { addToCart } = useCart()
-  const [storeProducts, setStoreProducts] = React.useState<Product[]>(
-    publicProducts.filter((p) => p.storeId === mockStore.id && p.active)
-  )
+  const { user, profile } = useAuth()
+  const searchParams = useSearchParams()
 
-  React.useEffect(() => {
-    async function load() {
-      const data = await fetchProductsFromSupabase()
-      const filtered = data.filter((p) => p.storeId === mockStore.id && p.active)
-      if (filtered.length > 0) {
-        setStoreProducts(filtered)
-      }
+  const store = data.store
+  const selectedCategory = searchParams.get("category")
+
+  const filteredProducts = React.useMemo(() => {
+    let products = data.products ?? []
+
+    if (selectedCategory) {
+      products = products.filter((p) => p.category === selectedCategory)
     }
-    load()
-  }, [])
+
+    return products
+  }, [data.products, selectedCategory])
 
   const handleAddToCart = (product: Product) => {
     addToCart({
@@ -39,16 +55,108 @@ export default function StorePage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <StoreNavbar store={mockStore} />
+      <StoreNavbar store={store} />
       <main>
-        <StoreHero store={mockStore} ctaLabel="Store Assistant" ctaHref="/store/chat" />
+        <section className="pt-8 pb-2">
+          <div className="max-w-7xl mx-auto px-6 text-center">
+            <p className="text-lg font-medium text-muted-foreground">
+              {profile?.name || user?.email?.split("@")[0] || "Store"}
+            </p>
+          </div>
+        </section>
+        <StoreHero store={store} ctaLabel="Store Assistant" ctaHref="/store/chat" />
+        <CategoryGrid
+          storeSlug={store.slug}
+          categories={[
+            { name: "Ladies Shirts", image: "/categories/ladies-shirts.jpg", slug: "ladies-shirts" },
+            { name: "Ladies Suits", image: "/categories/ladies-suits.jpg", slug: "ladies-suits" },
+            { name: "Frocks", image: "/categories/frocks.jpg", slug: "frocks" },
+          ]}
+          activeCategory={selectedCategory}
+        />
+        {selectedCategory && (
+          <section className="py-4">
+            <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
+              <h2 className="text-xl font-semibold capitalize">
+                {selectedCategory.replace(/-/g, " ")}
+              </h2>
+              <a
+                href={`/store/${store.slug}`}
+                className="text-sm font-medium text-primary hover:underline"
+              >
+                Clear filter
+              </a>
+            </div>
+          </section>
+        )}
         <section className="py-16">
           <div className="max-w-7xl mx-auto px-6">
-            <ProductGrid products={storeProducts} onAddToCart={handleAddToCart} storeSlug={mockStore.slug} />
+            <ProductGrid products={filteredProducts} onAddToCart={handleAddToCart} storeSlug={store.slug} />
           </div>
         </section>
       </main>
-      <StoreFooter store={mockStore} />
+      <StoreFooter store={store} />
     </div>
+  )
+}
+
+export default function StorePage() {
+  const [data, setData] = React.useState<StoreData | null>(null)
+  const [loading, setLoading] = React.useState(true)
+  const [error, setError] = React.useState<string | null>(null)
+
+  React.useEffect(() => {
+    async function load() {
+      try {
+        const res = await fetch("/api/store", { cache: "no-store" })
+        const json = await res.json()
+        if (!res.ok) {
+          throw new Error(json.error || "Failed to load store")
+        }
+        setData(json)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load store")
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-muted-foreground">Loading store...</p>
+      </div>
+    )
+  }
+
+  if (error || !data) {
+    const needsStore = error === "No store found"
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="max-w-md mx-auto text-center px-6">
+          <h1 className="text-2xl font-bold tracking-tight mb-4">
+            {needsStore ? "Welcome to Your Store" : "Store Error"}
+          </h1>
+          <p className="text-sm text-muted-foreground mb-6">
+            {needsStore
+              ? "You don't have a store yet. Create your first store from the dashboard to get started."
+              : error || "No store found"}
+          </p>
+          {needsStore && (
+            <a href="/dashboard" className="inline-flex items-center justify-center gap-2 rounded-2xl font-medium transition-all duration-200 bg-primary text-primary-foreground hover:bg-primary-light shadow-sm h-11 px-6 text-base">
+              Go to Dashboard
+            </a>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <React.Suspense fallback={<div className="min-h-screen bg-background flex items-center justify-center"><p className="text-muted-foreground">Loading store...</p></div>}>
+      <StorePageClient data={data} />
+    </React.Suspense>
   )
 }

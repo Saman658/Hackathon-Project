@@ -34,31 +34,31 @@ function NavbarInner({ onLoginClick, className }: NavbarProps) {
         </Link>
 
         <div className="hidden md:flex items-center gap-8">
-          <Link href="#features" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+          <Link href="#features" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap">
             Features
           </Link>
-          <Link href="#benefits" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+          <Link href="#benefits" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap">
             Benefits
           </Link>
-          <Link href="#pricing" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+          <Link href="#pricing" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap">
             Pricing
           </Link>
-          <Link href="/store" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+          <Link href="/store" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap">
             Store
           </Link>
-          <Link href="#testimonials" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+          <Link href="#testimonials" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap">
             Testimonials
           </Link>
-          <Link href="#faq" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+          <Link href="#faq" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap">
             FAQ
           </Link>
         </div>
 
         <div className="flex items-center gap-3">
-          <Button variant="ghost" onClick={onLoginClick} className="hidden md:inline-flex">
+          <Button variant="ghost" onClick={onLoginClick} className="hidden md:inline-flex whitespace-nowrap shrink-0">
             Sign in
           </Button>
-          <Button onClick={onLoginClick} className="hidden md:inline-flex">
+          <Button onClick={onLoginClick} className="hidden md:inline-flex whitespace-nowrap shrink-0">
             Get Started
           </Button>
           <Button variant="ghost" size="icon" className="md:hidden h-9 w-9 rounded-lg">

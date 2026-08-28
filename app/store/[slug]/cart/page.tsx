@@ -1,42 +1,80 @@
 "use client"
 
 import * as React from "react"
+
 import { useParams, notFound } from "next/navigation"
 import { StoreNavbar } from "@/components/store/store-navbar"
 import { StoreFooter } from "@/components/store/store-footer"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import type { Product } from "@/lib/data/products"
-import { publicProducts, parseStock, fetchProductsFromSupabase } from "@/lib/data/products"
-import { getStoreBySlug } from "@/lib/data/stores"
+import { parseStock } from "@/lib/data/products"
 import { useCart } from "@/components/store/cart-context"
 import { ArrowLeft, Minus, Plus, ShoppingCart, Trash2 } from "lucide-react"
 import Link from "next/link"
+
+interface StoreData {
+  store: {
+    id: string
+    name: string
+    slug: string
+    description: string
+    logo: string
+    heroTitle: string
+    heroDescription: string
+  }
+  products: Product[]
+}
 
 export default function CartPage() {
   const params = useParams()
   const slug = params.slug as string
   const { items, cartCount, updateQuantity, removeItem } = useCart()
 
-  const store = getStoreBySlug(slug)
-
-  if (!store) {
-    notFound()
-  }
-
-  const storeId = store.id
-  const [products, setProducts] = React.useState<Product[]>(publicProducts)
+  const [data, setData] = React.useState<StoreData | null>(null)
+  const [loading, setLoading] = React.useState(true)
+  const [error, setError] = React.useState<string | null>(null)
 
   React.useEffect(() => {
     async function load() {
-      const data = await fetchProductsFromSupabase()
-      const filtered = data.filter((p) => p.storeId === storeId && p.active)
-      if (filtered.length > 0) {
-        setProducts(filtered)
+      try {
+        const res = await fetch(`/api/store/${slug}`)
+        if (!res.ok) {
+          if (res.status === 404) {
+            notFound()
+            return
+          }
+          throw new Error("Failed to load store")
+        }
+        const json = await res.json()
+        setData(json)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load store")
+      } finally {
+        setLoading(false)
       }
     }
     load()
-  }, [storeId])
+  }, [slug])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-muted-foreground">Loading...</p>
+      </div>
+    )
+  }
+
+  if (error || !data) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-error">{error || "Store not found"}</p>
+      </div>
+    )
+  }
+
+  const store = data.store
+  const products = data.products
 
   const validatedItems = items
     .map((item) => {
@@ -103,7 +141,7 @@ export default function CartPage() {
                             className="h-full w-full object-cover"
                           />
                         ) : (
-                          <div className="h-full w-full flex items-center justify-center text-muted-foreground text-xs">
+                          <div className="flex h-full w-full items-center justify-center text-muted-foreground text-xs">
                             No image
                           </div>
                         )}

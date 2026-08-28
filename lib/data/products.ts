@@ -12,11 +12,13 @@ export interface Product {
   description: string
   storeId: string
   active: boolean
+  category?: string
 }
 
 export interface DatabaseProduct {
   id: string
   user_id: string
+  store_id?: string
   name: string
   description: string | null
   price: number
@@ -24,6 +26,7 @@ export interface DatabaseProduct {
   image_url: string | null
   status: string
   sku: string | null
+  category?: string | null
   created_at: string
   updated_at: string
 }
@@ -38,9 +41,15 @@ export function parseStock(value: string | number | undefined | null): number {
   return Infinity
 }
 
+export function getProductCategory(name: string): string | null {
+  const n = name.toLowerCase()
+  if (n.includes("frock") || n.includes("dress")) return "frocks"
+  if (n.includes("ladies suit") || n.includes("suit")) return "ladies-suits"
+  if (n.includes("ladies shirt") || n.includes("shirt")) return "ladies-shirts"
+  return null
+}
+
 export function toProduct(db: DatabaseProduct): Product {
-  const localProduct = products.find((p) => p.sku === db.sku)
-  const image = db.image_url || localProduct?.image || null
   return {
     id: db.id,
     name: db.name,
@@ -48,25 +57,27 @@ export function toProduct(db: DatabaseProduct): Product {
     price: `$${db.price.toFixed(2)}`,
     stock: String(db.stock),
     status: db.status,
-    image,
+    image: db.image_url || null,
     description: db.description || "",
-    storeId: "nexus",
+    storeId: db.store_id || "",
     active: db.status === "Active",
+    category: (db.category || getProductCategory(db.name)) || undefined,
   }
 }
 
-export function toDatabaseProduct(product: Partial<Product> & { user_id: string }): Omit<DatabaseProduct, 'created_at' | 'updated_at' | 'id'> {
+export function toDatabaseProduct(product: Partial<Product> & { user_id: string; store_id?: string }): Omit<DatabaseProduct, 'created_at' | 'updated_at' | 'id'> {
   const priceStr = product.price || "0"
   const priceNum = parseFloat(priceStr.replace(/[^0-9.]/g, "")) || 0
   const stockNum = parseInt(product.stock || "0", 10) || 0
 
   let imageUrl = product.image || null
-  if (imageUrl && !imageUrl.startsWith("/")) {
+  if (imageUrl && !/^https?:\/\//i.test(imageUrl) && !imageUrl.startsWith("/")) {
     imageUrl = `/${imageUrl}`
   }
 
   return {
     user_id: product.user_id,
+    store_id: product.store_id || product.user_id,
     name: product.name || "",
     description: product.description || null,
     price: priceNum,
@@ -74,70 +85,28 @@ export function toDatabaseProduct(product: Partial<Product> & { user_id: string 
     image_url: imageUrl,
     status: product.status || "Draft",
     sku: product.sku || null,
+    category: product.category || null,
   }
 }
 
-export const products: Product[] = [
-  { id: "1", name: "Suit Piece", sku: "PLAN-PRE", price: "$49.00", stock: "Unlimited", status: "Active", image: "/products/premium-plan.jpg", images: ["/products/premium-plan.jpg", "/products/basic-plan.jpg"], description: "Elevate your wardrobe with the Suit Piece — a refined men's suit crafted for professionals who demand elegance and confidence.", storeId: "nexus", active: true },
-  { id: "2", name: "Shoes", sku: "PLAN-BAS", price: "$19.00", stock: "Unlimited", status: "Active", image: "/products/basic-plan.jpg", images: ["/products/basic-plan.jpg", "/products/premium-plan.jpg"], description: "Step into style with our Shoes — premium footwear designed for everyday comfort and modern aesthetics.", storeId: "nexus", active: true },
-  { id: "3", name: "Dress Shirt", sku: "PLAN-ENT", price: "$149.00", stock: "Unlimited", status: "Active", image: "/products/enterprise-plan.jpg", description: "Make a lasting impression with the Dress Shirt — a high-quality formal shirt tailored for the modern professional.", storeId: "nexus", active: true },
-  { id: "4", name: "Add-on Pack", sku: "ADD-001", price: "$9.00", stock: "500", status: "Active", image: "/products/add-on-pack.jpg", description: "Unlock extra value with the Add-on Pack — a curated collection of accessories to enhance your experience.", storeId: "nexus", active: true },
-  { id: "5", name: "Headphones", sku: "SUP-OLD", price: "$29.00", stock: "10", status: "Discontinued", image: "/products/legacy-support.jpg", images: ["/products/legacy-support.jpg", "/products/legacy-support-2.jpg"], description: "Stay connected with Headphones — a professional headset delivering crystal-clear audio for calls and collaboration.", storeId: "nexus", active: true },
-  { id: "6", name: "Classic Ladies Watch", sku: "WATCH-001", price: "$45.00", stock: "10", status: "Active", image: "/products/classic-ladies-watch.jpg", images: [], description: "Elegant and stylish ladies watch for everyday and special occasions.", storeId: "nexus", active: true },
-]
-
-export const publicProducts: Product[] = [...products]
-
-export function addPublicProduct(product: Product) {
-  publicProducts.unshift(product)
-}
-
-export function updatePublicProduct(product: Product) {
-  const index = publicProducts.findIndex((p) => p.id === product.id)
-  if (index >= 0) {
-    publicProducts[index] = product
-  }
-}
-
-export function removePublicProduct(productId: string) {
-  const index = publicProducts.findIndex((p) => p.id === productId)
-  if (index >= 0) {
-    publicProducts.splice(index, 1)
-  }
-}
-
-export async function seedInitialProducts(_userId: string) {
-  return
-}
-
-export async function fetchProductsFromSupabase(): Promise<Product[]> {
+export async function fetchProductsFromSupabase(userId?: string, storeId?: string): Promise<Product[]> {
   const supabase = createClient()
-  const { data, error } = await supabase
-    .from("products")
-    .select("*")
+  let query = supabase.from("products").select("id, user_id, store_id, name, description, price, stock, image_url, status, sku, category, created_at, updated_at")
+
+  if (userId) {
+    query = query.eq("user_id", userId)
+  }
+
+  if (storeId) {
+    query = query.eq("store_id", storeId)
+  }
+
+  const { data, error } = await query
 
   if (error || !data || data.length === 0) {
-    if (publicProducts.length === 0) {
-      publicProducts.push(...products)
-    }
-    return publicProducts
+    return []
   }
 
-  const mapped = data.map(toProduct)
-  publicProducts.length = 0
-  publicProducts.push(...mapped)
-  return publicProducts
+  return data.map(toProduct)
 }
 
-export async function fetchProductFromSupabase(productId: string): Promise<Product | null> {
-  const supabase = createClient()
-  const { data, error } = await supabase
-    .from("products")
-    .select("*")
-    .eq("id", productId)
-    .single()
-
-  if (error || !data) return null
-
-  return toProduct(data)
-}

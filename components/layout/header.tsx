@@ -124,14 +124,12 @@ function HeaderInner({ className }: HeaderProps) {
 
           <Dropdown
             trigger={
-              <div className="flex items-center gap-2.5 cursor-pointer hover:bg-border-light rounded-xl px-2 py-1.5 transition-colors">
+              <div className="flex items-center gap-2 cursor-pointer hover:bg-border-light rounded-xl px-2 py-1.5 transition-colors">
                 <Avatar src="" alt={displayName} fallback={initials} size="sm" />
-                <div className="hidden md:block text-left">
-                  <p className="text-sm font-medium leading-none">{displayName}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {displayBusiness || displayEmail}
-                  </p>
-                </div>
+                <span className="hidden md:inline text-sm font-medium leading-none whitespace-nowrap">{displayName}</span>
+                <span className="hidden md:inline text-xs text-muted-foreground leading-none whitespace-nowrap">
+                  {displayBusiness || displayEmail}
+                </span>
                 <ChevronDown className="h-4 w-4 text-muted-foreground hidden md:block" />
               </div>
             }

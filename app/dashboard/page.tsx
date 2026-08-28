@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useRouter } from "next/navigation"
 import { Sidebar } from "@/components/layout/sidebar"
 import { Header } from "@/components/layout/header"
 import { AnalyticsCard, defaultCards } from "@/components/dashboard/analytics-card"
@@ -13,8 +14,9 @@ import { Input } from "@/components/ui/input"
 import { Modal, ModalContent, ModalHeader, ModalTitle, ModalBody, ModalFooter } from "@/components/ui/modal"
 import { useAuth } from "@/components/providers/auth-provider"
 import { useStores } from "@/lib/stores-context"
-import { Store, mockStore } from "@/lib/data/stores"
+import { Store } from "@/lib/data/stores"
 import { fetchOrdersFromSupabase } from "@/lib/data/orders"
+import { isValidLogoUrl } from "@/lib/validate-logo"
 
 const statusStyles: Record<string, "success" | "warning" | "outline"> = {
   Completed: "success",
@@ -27,19 +29,25 @@ function formatCurrency(value: number): string {
 }
 
 export default function DashboardPage() {
+  const router = useRouter()
   const { profile, user } = useAuth()
-  const { addStore } = useStores()
+  const { addStore, updateStore, stores } = useStores()
   const [modalOpen, setModalOpen] = React.useState(false)
+  const [editModalOpen, setEditModalOpen] = React.useState(false)
   const [successStore, setSuccessStore] = React.useState<Store | null>(null)
+  const [createError, setCreateError] = React.useState<string | null>(null)
   const [revenue, setRevenue] = React.useState(0)
   const [totalOrders, setTotalOrders] = React.useState(0)
   const [recentOrders, setRecentOrders] = React.useState<{ id: string; customer: string; product: string; amount: string; status: string; date: string }[]>([])
 
   React.useEffect(() => {
+    let cancelled = false
+
     async function load() {
       if (!user) return
       const data = await fetchOrdersFromSupabase(user.id)
       const completed = data.filter((o) => o.status === "Completed")
+      if (cancelled) return
       setRevenue(completed.reduce((sum, order) => sum + order.total, 0))
       setTotalOrders(completed.length)
 
@@ -55,9 +63,14 @@ export default function DashboardPage() {
           year: "numeric",
         }),
       }))
+      if (cancelled) return
       setRecentOrders(mapped)
     }
     load()
+
+    return () => {
+      cancelled = true
+    }
   }, [user])
 
   const cards = [
@@ -98,7 +111,18 @@ export default function DashboardPage() {
   const [heroTitle, setHeroTitle] = React.useState("")
   const [heroDescription, setHeroDescription] = React.useState("")
 
-  const [errors, setErrors] = React.useState<{ name?: string; slug?: string; heroTitle?: string; heroDescription?: string }>({})
+  const [errors, setErrors] = React.useState<{ name?: string; slug?: string; heroTitle?: string; heroDescription?: string; logo?: string }>({})
+
+  const [editingStore, setEditingStore] = React.useState<Store | null>(null)
+  const [editName, setEditName] = React.useState("")
+  const [editDescription, setEditDescription] = React.useState("")
+  const [editLogo, setEditLogo] = React.useState("")
+  const [editSlug, setEditSlug] = React.useState("")
+  const [editHeroTitle, setEditHeroTitle] = React.useState("")
+  const [editHeroDescription, setEditHeroDescription] = React.useState("")
+  const [editErrors, setEditErrors] = React.useState<{ name?: string; slug?: string; heroTitle?: string; heroDescription?: string; logo?: string }>({})
+  const [editError, setEditError] = React.useState<string | null>(null)
+  const [editSuccess, setEditSuccess] = React.useState(false)
 
   function resetForm() {
     setName("")
@@ -109,6 +133,27 @@ export default function DashboardPage() {
     setHeroDescription("")
     setErrors({})
     setSuccessStore(null)
+    setCreateError(null)
+  }
+
+  function resetEditForm() {
+    setEditingStore(null)
+    setEditName("")
+    setEditDescription("")
+    setEditLogo("")
+    setEditSlug("")
+    setEditHeroTitle("")
+    setEditHeroDescription("")
+    setEditErrors({})
+    setEditError(null)
+    setEditSuccess(false)
+  }
+
+  function handleEditOpenChange(open: boolean) {
+    if (!open) {
+      resetEditForm()
+    }
+    setEditModalOpen(open)
   }
 
   function handleOpenChange(open: boolean) {
@@ -118,35 +163,98 @@ export default function DashboardPage() {
     setModalOpen(open)
   }
 
+  function handleOpenEdit(store: Store) {
+    setEditingStore(store)
+    setEditName(store.name)
+    setEditDescription(store.description)
+    setEditLogo(store.logo)
+    setEditSlug(store.slug)
+    setEditHeroTitle(store.heroTitle)
+    setEditHeroDescription(store.heroDescription)
+    setEditErrors({})
+    setEditError(null)
+    setEditSuccess(false)
+    setEditModalOpen(true)
+  }
+
   function autoSlug(value: string) {
     const parts = value.toLowerCase().trim().replace(/[^\w\s-]/g, "").replace(/[\s_-]+/g, "-").replace(/^-+|-+$/g, "").split("-")
     return parts.filter(Boolean).join("-")
   }
 
   function validate() {
-    const newErrors: { name?: string; slug?: string; heroTitle?: string; heroDescription?: string } = {}
+    const newErrors: { name?: string; slug?: string; heroTitle?: string; heroDescription?: string; logo?: string } = {}
     if (!name.trim()) newErrors.name = "Store name is required"
     if (!slug.trim()) newErrors.slug = "Store slug is required"
     if (!heroTitle.trim()) newErrors.heroTitle = "Hero title is required"
     if (!heroDescription.trim()) newErrors.heroDescription = "Hero description is required"
+    if (logo.trim() && !isValidLogoUrl(logo)) newErrors.logo = "Logo must be a valid image URL (https://…)"
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
 
-  function handleCreate() {
+  function validateEdit() {
+    const newErrors: { name?: string; slug?: string; heroTitle?: string; heroDescription?: string; logo?: string } = {}
+    if (!editName.trim()) newErrors.name = "Store name is required"
+    if (!editSlug.trim()) newErrors.slug = "Store slug is required"
+    if (!editHeroTitle.trim()) newErrors.heroTitle = "Hero title is required"
+    if (!editHeroDescription.trim()) newErrors.heroDescription = "Hero description is required"
+    if (editLogo.trim() && !isValidLogoUrl(editLogo)) newErrors.logo = "Logo must be a valid image URL (https://…)"
+    setEditErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
+  async function handleCreate() {
+    setCreateError(null)
     if (!validate()) return
-    const created = addStore({
-      name: name.trim(),
-      description: description.trim(),
-      logo: logo.trim(),
-      slug: slug.trim(),
-      heroTitle: heroTitle.trim(),
-      heroDescription: heroDescription.trim(),
-    })
-    setSuccessStore(created)
+    try {
+      const created = await addStore({
+        name: name.trim(),
+        description: description.trim(),
+        logo: logo.trim(),
+        slug: slug.trim(),
+        heroTitle: heroTitle.trim(),
+        heroDescription: heroDescription.trim(),
+      })
+      if (created) {
+        setSuccessStore(created)
+      }
+    } catch (err) {
+      setCreateError(err instanceof Error ? err.message : "Failed to create store")
+    }
+  }
+
+  async function handleEdit() {
+    setEditError(null)
+    if (!validateEdit()) return
+    if (!editingStore) return
+    try {
+      const updated = await updateStore({
+        id: editingStore.id,
+        name: editName.trim(),
+        description: editDescription.trim(),
+        logo: editLogo.trim(),
+        slug: editSlug.trim(),
+        heroTitle: editHeroTitle.trim(),
+        heroDescription: editHeroDescription.trim(),
+        userId: editingStore.userId,
+      })
+      if (updated) {
+        setEditSuccess(true)
+      }
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : "Failed to update store")
+    }
   }
 
   const isSuccess = successStore !== null
+
+  React.useEffect(() => {
+    if (isSuccess && successStore?.slug) {
+      const t = setTimeout(() => router.push(`/store/${successStore.slug}`), 1500)
+      return () => clearTimeout(t)
+    }
+  }, [isSuccess, successStore, router])
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -162,7 +270,12 @@ export default function DashboardPage() {
                   {profile?.business_name || "Here's what's happening with your business today."}
                 </p>
               </div>
-              <Button onClick={() => { resetForm(); setModalOpen(true) }}>Create Store</Button>
+              <div className="flex items-center gap-3">
+                {stores.length > 0 && (
+                  <Button variant="secondary" onClick={() => handleOpenEdit(stores[0])}>Edit Store</Button>
+                )}
+                <Button onClick={() => { resetForm(); setModalOpen(true) }}>Create Store</Button>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -241,7 +354,7 @@ export default function DashboardPage() {
               <p className="text-sm text-muted-foreground mb-6">You can continue setting up your dashboard or preview your new store.</p>
               <div className="rounded-2xl border border-border bg-surface p-4 w-full flex items-center gap-4">
                 <div className="h-12 w-12 rounded-xl border border-border overflow-hidden bg-border-light shrink-0">
-                  {successStore.logo ? (
+                  {successStore.logo && isValidLogoUrl(successStore.logo) ? (
                     <img src={successStore.logo} alt={successStore.name} className="h-full w-full object-cover" />
                   ) : (
                     <div className="h-full w-full flex items-center justify-center text-muted-foreground text-xs">No logo</div>
@@ -253,12 +366,18 @@ export default function DashboardPage() {
                 </div>
               </div>
               <div className="flex items-center justify-end gap-3 mt-6 w-full">
-                <Button onClick={() => handleOpenChange(false)}>Done</Button>
+                <Button variant="secondary" onClick={() => handleOpenChange(false)}>Done</Button>
+                <Button onClick={() => { handleOpenChange(false); router.push(`/store/${successStore.slug}`); }}>View Store</Button>
               </div>
             </div>
           ) : (
-            <form onSubmit={(e) => { e.preventDefault(); handleCreate() }} className="flex flex-col">
-              <ModalBody className="space-y-4 max-h-[60vh] overflow-y-auto">
+            <form onSubmit={(e) => { e.preventDefault(); handleCreate() }} className="flex flex-col flex-1 min-h-0">
+              <ModalBody className="space-y-4 flex-1 min-h-0 overflow-y-auto">
+                {createError && (
+                  <div className="rounded-xl border border-error/30 bg-error-bg px-4 py-3">
+                    <p className="text-sm text-error">{createError}</p>
+                  </div>
+                )}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="text-sm font-medium text-foreground mb-1.5 block">Store Name <span className="text-error">*</span></label>
@@ -282,7 +401,8 @@ export default function DashboardPage() {
                 </div>
                 <div>
                   <label className="text-sm font-medium text-foreground mb-1.5 block">Logo / Image URL</label>
-                  <Input value={logo} onChange={(e) => setLogo(e.target.value)} placeholder="https://example.com/logo.png" />
+                  <Input value={logo} onChange={(e) => setLogo(e.target.value)} placeholder="https://example.com/logo.png" error={errors.logo} />
+                  {errors.logo && <p className="text-xs text-error mt-1.5">{errors.logo}</p>}
                 </div>
                 <div>
                   <label className="text-sm font-medium text-foreground mb-1.5 block">Hero Title <span className="text-error">*</span></label>
@@ -303,7 +423,7 @@ export default function DashboardPage() {
                   <div className="rounded-2xl border border-border bg-surface p-4">
                     <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Preview</p>
                     <div className="rounded-xl border border-border overflow-hidden bg-border-light">
-                      {logo ? (
+                      {logo && isValidLogoUrl(logo) ? (
                         <img src={logo} alt="Store logo preview" className="h-40 w-full object-cover" />
                       ) : (
                         <div className="h-40 w-full flex items-center justify-center text-muted-foreground text-sm">No logo provided</div>
@@ -324,6 +444,99 @@ export default function DashboardPage() {
           )}
         </ModalContent>
       </Modal>
+
+      <Modal open={editModalOpen} onOpenChange={handleEditOpenChange} maxWidth="max-w-2xl">
+        <ModalContent className="max-w-2xl">
+          <ModalHeader>
+            <ModalTitle>{editSuccess ? "Store Updated" : "Edit Store"}</ModalTitle>
+          </ModalHeader>
+          {editSuccess ? (
+            <div className="flex flex-col items-center text-center py-6">
+              <div className="h-16 w-16 rounded-full bg-success-bg text-success flex items-center justify-center mb-4">
+                <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <p className="text-base font-medium mb-1">Your store has been updated successfully.</p>
+              <div className="flex items-center justify-end gap-3 mt-6 w-full">
+                <Button onClick={() => handleEditOpenChange(false)}>Done</Button>
+              </div>
+            </div>
+          ) : (
+            <form onSubmit={(e) => { e.preventDefault(); handleEdit() }} className="flex flex-col flex-1 min-h-0">
+              <ModalBody className="space-y-4 flex-1 min-h-0 overflow-y-auto">
+                {editError && (
+                  <div className="rounded-xl border border-error/30 bg-error-bg px-4 py-3">
+                    <p className="text-sm text-error">{editError}</p>
+                  </div>
+                )}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-foreground mb-1.5 block">Store Name <span className="text-error">*</span></label>
+                    <Input value={editName} onChange={(e) => { setEditName(e.target.value); if (!editSlug) setEditSlug(autoSlug(e.target.value)) }} placeholder="e.g. Fatima Fashion" error={editErrors.name} />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-foreground mb-1.5 block">Store Slug <span className="text-error">*</span></label>
+                    <Input value={editSlug} onChange={(e) => setEditSlug(autoSlug(e.target.value))} placeholder="e.g. fatima-fashion" error={editErrors.slug} />
+                    <p className="text-xs text-muted-foreground mt-1.5">Used in your store URL.</p>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-foreground mb-1.5 block">Store Description</label>
+                  <textarea
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
+                    placeholder="Briefly describe your store"
+                    rows={3}
+                    className="flex w-full rounded-xl border border-border bg-transparent px-4 py-3 text-base placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-all duration-200 resize-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-foreground mb-1.5 block">Logo / Image URL</label>
+                  <Input value={editLogo} onChange={(e) => setEditLogo(e.target.value)} placeholder="https://example.com/logo.png" error={editErrors.logo} />
+                  {editErrors.logo && <p className="text-xs text-error mt-1.5">{editErrors.logo}</p>}
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-foreground mb-1.5 block">Hero Title <span className="text-error">*</span></label>
+                  <Input value={editHeroTitle} onChange={(e) => setEditHeroTitle(e.target.value)} placeholder="e.g. Summer Collection 2026" error={editErrors.heroTitle} />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-foreground mb-1.5 block">Hero Description <span className="text-error">*</span></label>
+                  <textarea
+                    value={editHeroDescription}
+                    onChange={(e) => setEditHeroDescription(e.target.value)}
+                    placeholder="A short description shown on your store hero"
+                    rows={3}
+                    className="flex w-full rounded-xl border border-border bg-transparent px-4 py-3 text-base placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-all duration-200 resize-none"
+                  />
+                </div>
+
+                {(editName || editHeroTitle || editHeroDescription || editLogo) && (
+                  <div className="rounded-2xl border border-border bg-surface p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Preview</p>
+                    <div className="rounded-xl border border-border overflow-hidden bg-border-light">
+                      {editLogo && isValidLogoUrl(editLogo) ? (
+                        <img src={editLogo} alt="Store logo preview" className="h-40 w-full object-cover" />
+                      ) : (
+                        <div className="h-40 w-full flex items-center justify-center text-muted-foreground text-sm">No logo provided</div>
+                      )}
+                      <div className="p-4">
+                        <p className="text-lg font-semibold">{editHeroTitle || "Your Hero Title"}</p>
+                        <p className="text-sm text-muted-foreground mt-1">{editHeroDescription || "Your hero description will appear here."}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="secondary" type="button" onClick={() => handleEditOpenChange(false)}>Cancel</Button>
+                <Button type="submit">Save Changes</Button>
+              </ModalFooter>
+            </form>
+          )}
+        </ModalContent>
+      </Modal>
     </div>
   )
 }
+

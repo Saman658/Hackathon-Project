@@ -1,88 +1,97 @@
 "use client"
 
 import * as React from "react"
-import { useParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import { StoreNavbar } from "@/components/store/store-navbar"
 import { StoreFooter } from "@/components/store/store-footer"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import type { Product } from "@/lib/data/products"
-import { publicProducts, parseStock, fetchProductFromSupabase } from "@/lib/data/products"
-import Link from "next/link"
-import { ArrowLeft, ShoppingCart, Zap, Minus, Plus } from "lucide-react"
+import { parseStock } from "@/lib/data/products"
 import { useCart } from "@/components/store/cart-context"
-import { mockStore } from "@/lib/data/stores"
+import { ArrowLeft, Minus, Plus } from "lucide-react"
+import Link from "next/link"
+
+interface ProductData {
+  product: Product
+  store: {
+    id: string
+    name: string
+    slug: string
+    description: string
+    logo: string
+    heroTitle: string
+    heroDescription: string
+  }
+}
 
 export default function ProductDetailPage() {
   const params = useParams()
+  const router = useRouter()
+  const productId = params.id as string
   const { addToCart } = useCart()
-  const [product, setProduct] = React.useState<Product | null>(null)
+
+  const [data, setData] = React.useState<ProductData | null>(null)
   const [loading, setLoading] = React.useState(true)
-  const stock = parseStock(product?.stock)
-  const isOutOfStock = stock === 0
 
   React.useEffect(() => {
     async function load() {
-      if (!params.id) {
+      try {
+        const res = await fetch(`/api/store/products/${productId}`)
+        if (!res.ok) {
+          setLoading(false)
+          return
+        }
+        const json = await res.json()
+        setData(json)
+      } catch {
+        // ignore
+      } finally {
         setLoading(false)
-        return
       }
-      const found = publicProducts.find((p) => p.id === params.id) || null
-      if (found) {
-        setProduct(found)
-        setLoading(false)
-        return
-      }
-      const supabaseProduct = await fetchProductFromSupabase(params.id as string)
-      setProduct(supabaseProduct)
-      setLoading(false)
     }
     load()
-  }, [params.id])
+  }, [productId])
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background">
-        <StoreNavbar store={mockStore} />
-        <main className="max-w-7xl mx-auto px-6 py-16">
-          <Card>
-            <CardContent className="p-8 text-center">
-              <h1 className="text-2xl font-bold mb-2">Loading...</h1>
-            </CardContent>
-          </Card>
-        </main>
-        <StoreFooter store={mockStore} />
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-muted-foreground">Loading...</p>
       </div>
     )
   }
 
-  if (!product) {
+  if (!data) {
     return (
-      <div className="min-h-screen bg-background">
-        <StoreNavbar store={mockStore} />
-        <main className="max-w-7xl mx-auto px-6 py-16">
-          <Card>
-            <CardContent className="p-8 text-center">
-              <h1 className="text-2xl font-bold mb-2">Product not found</h1>
-              <p className="text-muted-foreground mb-6">The product you are looking for does not exist.</p>
-              <Link href="/store">
-                <Button>Back to Store</Button>
-              </Link>
-            </CardContent>
-          </Card>
-        </main>
-        <StoreFooter store={mockStore} />
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-error">Product not found</p>
       </div>
     )
+  }
+
+  const store = data.store
+  const product = data.product
+  const stock = parseStock(product?.stock)
+  const isOutOfStock = stock === 0
+
+  function handleOrderNow() {
+    if (isOutOfStock || !product) return
+    addToCart({
+      productId: product.id,
+      name: product.name,
+      price: product.price,
+      image: product.image,
+    })
+    router.push(`/store/${store.slug}/checkout`)
   }
 
   return (
     <div className="min-h-screen bg-background">
-      <StoreNavbar store={mockStore} />
+      <StoreNavbar store={store} />
       <main className="max-w-7xl mx-auto px-6 py-16">
         <div className="mb-6">
-          <Link href="/store" className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+          <Link href={`/store/${store.slug}`} className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Store
           </Link>
@@ -90,7 +99,7 @@ export default function ProductDetailPage() {
 
         <Card>
           <div className="grid grid-cols-1 md:grid-cols-2">
-            <Link href={`/store/product/${product.id}`} className="block">
+            <div className="flex flex-col gap-4 p-4">
               <div className="aspect-square w-full overflow-hidden bg-border-light md:aspect-auto md:h-full">
                 {product.image ? (
                   <img
@@ -99,17 +108,17 @@ export default function ProductDetailPage() {
                     className="h-full w-full object-cover"
                   />
                 ) : (
-                  <div className="h-full w-full flex items-center justify-center text-muted-foreground">
+                  <div className="flex h-full w-full items-center justify-center text-muted-foreground">
                     No image
                   </div>
                 )}
               </div>
-            </Link>
+            </div>
             <div className="flex flex-col">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
-                    <Link href={`/store/product/${product.id}`} className="group">
+                    <Link href={`/store/${store.slug}/product/${product.id}`} className="group">
                       <CardTitle className="text-2xl group-hover:text-accent transition-colors">{product.name}</CardTitle>
                     </Link>
                     <CardDescription className="mt-1">SKU: {product.sku}</CardDescription>
@@ -128,7 +137,7 @@ export default function ProductDetailPage() {
                   <div>
                     <p className="text-sm text-muted-foreground mb-1">Stock</p>
                     <p className={`text-2xl font-bold ${isOutOfStock ? "text-error" : ""}`}>
-                      {isOutOfStock ? "Out of Stock" : product.stock}
+                      {isOutOfStock ? "Out of Stock" : "In Stock"}
                     </p>
                   </div>
                 </div>
@@ -169,7 +178,7 @@ export default function ProductDetailPage() {
                     })} disabled={isOutOfStock}>
                       <span className="whitespace-nowrap">{isOutOfStock ? "Out of Stock" : "Add to Cart"}</span>
                     </Button>
-                    <Button className="w-full sm:flex-1 min-w-0 whitespace-nowrap" disabled={isOutOfStock}>
+                    <Button className="w-full sm:flex-1 min-w-0 whitespace-nowrap" onClick={handleOrderNow} disabled={isOutOfStock}>
                       <span className="whitespace-nowrap">Order Now</span>
                     </Button>
                   </div>
@@ -179,7 +188,7 @@ export default function ProductDetailPage() {
           </div>
         </Card>
       </main>
-      <StoreFooter store={mockStore} />
+      <StoreFooter store={store} />
     </div>
   )
 }

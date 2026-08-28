@@ -48,6 +48,25 @@ export async function updatePassword(newPassword: string) {
   if (error) throw error
 }
 
+export async function updatePasswordWithCurrent(currentPassword: string, newPassword: string) {
+  const supabase = createClient()
+  
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+  
+  const { error: verifyError } = await supabase.auth.signInWithPassword({
+    email: user.email!,
+    password: currentPassword,
+  })
+  
+  if (verifyError) {
+    throw new Error('Current password is incorrect')
+  }
+  
+  const { error } = await supabase.auth.updateUser({ password: newPassword })
+  if (error) throw error
+}
+
 export async function updateEmail(newEmail: string) {
   const supabase = createClient()
   const { error } = await supabase.auth.updateUser({ email: newEmail })

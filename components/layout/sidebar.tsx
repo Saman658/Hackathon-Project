@@ -14,6 +14,7 @@ import {
   ShoppingCart,
   Package,
   Brain,
+  Store,
   AlertTriangle,
   Settings,
   HelpCircle,
@@ -30,6 +31,7 @@ const navItems = [
   { href: "/dashboard/products", label: "Products", icon: Package },
   { href: "/dashboard/problems", label: "Problems", icon: AlertTriangle },
   { href: "/dashboard/ai-insights", label: "AI Insights", icon: Brain },
+  { href: "/store", label: "Store", icon: Store },
 ]
 
 const bottomNavItems = [
@@ -43,6 +45,7 @@ interface SidebarProps {
 }
 
 function SidebarInner({ className }: SidebarProps) {
+  // compact sidebar spacing
   const [collapsed, setCollapsed] = React.useState(false)
   const pathname = usePathname()
 
@@ -70,7 +73,7 @@ function SidebarInner({ className }: SidebarProps) {
         </Button>
       </div>
 
-      <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-6">
+      <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-2">
         <div className="space-y-1">
           {navItems.map((item) => {
             const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href))
@@ -80,7 +83,7 @@ function SidebarInner({ className }: SidebarProps) {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                  "flex items-center gap-1.5 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
                   isActive
                     ? "bg-primary text-primary-foreground shadow-sm"
                     : "text-muted-foreground hover:bg-border-light hover:text-foreground",
@@ -108,7 +111,7 @@ function SidebarInner({ className }: SidebarProps) {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                  "flex items-center gap-1.5 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
                   isActive
                     ? "bg-primary text-primary-foreground shadow-sm"
                     : "text-muted-foreground hover:bg-border-light hover:text-foreground",
@@ -131,7 +134,7 @@ function SidebarInner({ className }: SidebarProps) {
             window.location.href = "/"
           }}
           className={cn(
-            "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-border-light hover:text-foreground transition-all duration-200 w-full",
+            "flex items-center gap-1.5 rounded-xl px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-border-light hover:text-foreground transition-all duration-200 w-full",
             collapsed && "justify-center px-2"
           )}
         >
