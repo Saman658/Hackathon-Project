@@ -160,7 +160,7 @@ export default function ChatPage() {
 
   React.useEffect(() => {
     async function load() {
-      const res = await fetch("/api/store")
+      const res = await fetch("/api/store", { cache: "no-store" })
       if (res.ok) {
         const json = await res.json()
         setStore(json.store)

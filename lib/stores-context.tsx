@@ -48,6 +48,20 @@ export function StoresProvider({ children }: { children: React.ReactNode }) {
       throw new Error("You must be logged in to create a store")
     }
 
+    // One-store-per-user enforcement (database also enforces via UNIQUE).
+    // We pre-check here so we can return a friendly error instead of a
+    // generic 23505 constraint violation message.
+    const { data: existing } = await supabase
+      .from("stores")
+      .select("id")
+      .eq("user_id", userId)
+      .limit(1)
+      .maybeSingle()
+
+    if (existing) {
+      throw new Error("You already have a store. Each admin can only create one store.")
+    }
+
     const { data, error } = await supabase
       .from("stores")
       .insert({
@@ -63,6 +77,10 @@ export function StoresProvider({ children }: { children: React.ReactNode }) {
       .single()
 
     if (error || !data) {
+      // Belt-and-suspenders: catch the DB constraint error too.
+      if (error?.code === "23505" || /stores_user_id_unique/i.test(error?.message || "")) {
+        throw new Error("You already have a store. Each admin can only create one store.")
+      }
       throw new Error(error?.message || "Failed to create store")
     }
 

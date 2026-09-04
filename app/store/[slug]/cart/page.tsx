@@ -38,7 +38,7 @@ export default function CartPage() {
   React.useEffect(() => {
     async function load() {
       try {
-        const res = await fetch(`/api/store/${slug}`)
+        const res = await fetch(`/api/store/${slug}`, { cache: "no-store" })
         if (!res.ok) {
           if (res.status === 404) {
             notFound()

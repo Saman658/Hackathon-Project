@@ -11,7 +11,7 @@ import { Modal, ModalContent, ModalHeader, ModalTitle, ModalBody, ModalFooter } 
 import { EmptyState } from "@/components/ui/empty-state"
 import type { Product } from "@/lib/data/products"
 import { toProduct, toDatabaseProduct } from "@/lib/data/products"
-import { getStoresFromSupabase } from "@/lib/data/stores"
+import { getStoresFromSupabase, verifyStoreOwnership } from "@/lib/data/stores"
 import { Pencil, Trash2 } from "lucide-react"
 import { useAuth } from "@/components/providers/auth-provider"
 import { createClient } from "@/lib/supabase/client"
@@ -176,6 +176,8 @@ export default function ProductsPage() {
 
   async function confirmDelete() {
     if (!deleteProductId || !user) return
+    const product = products.find((p) => p.id === deleteProductId)
+    if (!product) return
     setDeleting(true)
     setDeleteError(null)
     const supabase = createClient()
@@ -184,6 +186,7 @@ export default function ProductsPage() {
       .delete()
       .eq("id", deleteProductId)
       .eq("user_id", user.id)
+      .eq("store_id", product.storeId)
 
     if (error) {
       setDeleteError(error.message)
@@ -218,7 +221,19 @@ export default function ProductsPage() {
     e.preventDefault()
     if (!validate() || !user) return
 
+    if (!storeId || !userStores.some((s) => s.id === storeId)) {
+      setError("Please select a valid store. The selected store does not belong to you.")
+      return
+    }
+
+    const storeOwned = await verifyStoreOwnership(storeId, user.id)
+    if (!storeOwned) {
+      setError("Store verification failed. The selected store does not belong to you.")
+      return
+    }
+
     setSaving(true)
+    setError(null)
     const supabase = createClient()
     const dbProduct = toDatabaseProduct({
       ...(editingProduct || {}),

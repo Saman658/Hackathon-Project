@@ -4,9 +4,9 @@ import * as React from "react"
 import { useRouter } from "next/navigation"
 import { Sidebar } from "@/components/layout/sidebar"
 import { Header } from "@/components/layout/header"
-import { AnalyticsCard, defaultCards } from "@/components/dashboard/analytics-card"
+import { AnalyticsCard } from "@/components/dashboard/analytics-card"
 import { ChartPlaceholder } from "@/components/dashboard/chart-placeholder"
-import { ActivityList, defaultActivities } from "@/components/dashboard/activity-list"
+import { ActivityList } from "@/components/dashboard/activity-list"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -15,13 +15,16 @@ import { Modal, ModalContent, ModalHeader, ModalTitle, ModalBody, ModalFooter } 
 import { useAuth } from "@/components/providers/auth-provider"
 import { useStores } from "@/lib/stores-context"
 import { Store } from "@/lib/data/stores"
-import { fetchOrdersFromSupabase } from "@/lib/data/orders"
+import { useStoreOrders } from "@/lib/hooks/use-store-orders"
 import { isValidLogoUrl } from "@/lib/validate-logo"
+import { DollarSign, ShoppingCart, Clock, CheckCircle2 } from "lucide-react"
 
-const statusStyles: Record<string, "success" | "warning" | "outline"> = {
+const statusStyles: Record<string, "success" | "warning" | "outline" | "default"> = {
   Completed: "success",
   Processing: "warning",
   Pending: "outline",
+  Cancelled: "default",
+  Shipped: "default",
 }
 
 function formatCurrency(value: number): string {
@@ -32,77 +35,80 @@ export default function DashboardPage() {
   const router = useRouter()
   const { profile, user } = useAuth()
   const { addStore, updateStore, stores } = useStores()
+  const { orders, stats } = useStoreOrders(user?.id)
   const [modalOpen, setModalOpen] = React.useState(false)
   const [editModalOpen, setEditModalOpen] = React.useState(false)
   const [successStore, setSuccessStore] = React.useState<Store | null>(null)
   const [createError, setCreateError] = React.useState<string | null>(null)
-  const [revenue, setRevenue] = React.useState(0)
-  const [totalOrders, setTotalOrders] = React.useState(0)
-  const [recentOrders, setRecentOrders] = React.useState<{ id: string; customer: string; product: string; amount: string; status: string; date: string }[]>([])
 
-  React.useEffect(() => {
-    let cancelled = false
-
-    async function load() {
-      if (!user) return
-      const data = await fetchOrdersFromSupabase(user.id)
-      const completed = data.filter((o) => o.status === "Completed")
-      if (cancelled) return
-      setRevenue(completed.reduce((sum, order) => sum + order.total, 0))
-      setTotalOrders(completed.length)
-
-      const mapped = data.slice(0, 5).map((order) => ({
+  const recentOrders = React.useMemo(
+    () =>
+      orders.slice(0, 5).map((order) => ({
         id: order.id,
         customer: order.customer.fullName,
         product: order.items[0]?.name || "Multiple items",
-        amount: `$${order.total.toFixed(2)}`,
+        amount: formatCurrency(order.total),
         status: order.status,
         date: new Date(order.createdAt).toLocaleDateString("en-US", {
           month: "short",
           day: "numeric",
           year: "numeric",
         }),
-      }))
-      if (cancelled) return
-      setRecentOrders(mapped)
-    }
-    load()
+      })),
+    [orders]
+  )
 
-    return () => {
-      cancelled = true
-    }
-  }, [user])
+  const cards = React.useMemo(
+    () => [
+      {
+        title: "Total Revenue",
+        value: formatCurrency(stats.revenue),
+        change: stats.revenue > 0 ? "+100%" : "0%",
+        trend: stats.revenue > 0 ? ("up" as const) : ("neutral" as const),
+        icon: <DollarSign className="h-5 w-5" />,
+      },
+      {
+        title: "Total Orders",
+        value: stats.total.toString(),
+        change: stats.total > 0 ? "+100%" : "0%",
+        trend: stats.total > 0 ? ("up" as const) : ("neutral" as const),
+        icon: <ShoppingCart className="h-5 w-5" />,
+      },
+      {
+        title: "Pending Orders",
+        value: stats.pending.toString(),
+        change: stats.pending > 0 ? `${stats.pending} new` : "0",
+        trend: stats.pending > 0 ? ("up" as const) : ("neutral" as const),
+        icon: <Clock className="h-5 w-5" />,
+      },
+      {
+        title: "Completed Orders",
+        value: stats.completed.toString(),
+        change: stats.completed > 0 ? "+100%" : "0%",
+        trend: stats.completed > 0 ? ("up" as const) : ("neutral" as const),
+        icon: <CheckCircle2 className="h-5 w-5" />,
+      },
+    ],
+    [stats]
+  )
 
-  const cards = [
-    {
-      title: "Total Revenue",
-      value: formatCurrency(revenue),
-      change: revenue > 0 ? "+100%" : "0%",
-      trend: revenue > 0 ? "up" as const : "neutral" as const,
-      icon: defaultCards[0].icon,
-    },
-    {
-      title: "Active Customers",
-      value: defaultCards[1].value,
-      change: defaultCards[1].change,
-      trend: defaultCards[1].trend,
-      icon: defaultCards[1].icon,
-    },
-    {
-      title: "Total Orders",
-      value: totalOrders.toString(),
-      change: totalOrders > 0 ? "+100%" : "0%",
-      trend: totalOrders > 0 ? "up" as const : "neutral" as const,
-      icon: defaultCards[2].icon,
-    },
-    {
-      title: "Conversion Rate",
-      value: defaultCards[3].value,
-      change: defaultCards[3].change,
-      trend: defaultCards[3].trend,
-      icon: defaultCards[3].icon,
-    },
-  ]
+  const activities = React.useMemo(
+    () =>
+      orders.slice(0, 5).map((order) => ({
+        id: order.id,
+        title: `Order ${order.id.slice(0, 8)}`,
+        description: `${order.customer.fullName} • ${formatCurrency(order.total)}`,
+        time: new Date(order.createdAt).toLocaleString("en-US", {
+          month: "short",
+          day: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+        }),
+        type: order.status === "Completed" ? ("payment" as const) : order.status === "Cancelled" ? ("alert" as const) : ("order" as const),
+        user: { name: order.customer.fullName, avatar: "" },
+      })),
+    [orders]
+  )
 
   const [name, setName] = React.useState("")
   const [description, setDescription] = React.useState("")
@@ -314,24 +320,41 @@ export default function DashboardPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {recentOrders.map((order) => (
-                        <TableRow key={order.id}>
-                          <TableCell className="font-medium">{order.id}</TableCell>
-                          <TableCell>{order.customer}</TableCell>
-                          <TableCell>{order.product}</TableCell>
-                          <TableCell>{order.amount}</TableCell>
-                          <TableCell>
-                            <Badge variant={statusStyles[order.status]}>{order.status}</Badge>
+                      {recentOrders.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                            No orders yet. Customer orders will appear here in real time.
                           </TableCell>
-                          <TableCell className="text-muted-foreground">{order.date}</TableCell>
                         </TableRow>
-                      ))}
+                      ) : (
+                        recentOrders.map((order) => (
+                          <TableRow key={order.id}>
+                            <TableCell className="font-medium">{order.id}</TableCell>
+                            <TableCell>{order.customer}</TableCell>
+                            <TableCell>{order.product}</TableCell>
+                            <TableCell>{order.amount}</TableCell>
+                            <TableCell>
+                              <Badge variant={statusStyles[order.status] || "default"}>{order.status}</Badge>
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">{order.date}</TableCell>
+                          </TableRow>
+                        ))
+                      )}
                     </TableBody>
                   </Table>
                 </div>
               </div>
               <div>
-                <ActivityList activities={defaultActivities} />
+                {activities.length === 0 ? (
+                  <div className="rounded-2xl border border-border bg-surface p-8">
+                    <h3 className="text-lg font-semibold mb-2">Recent Activity</h3>
+                    <p className="text-sm text-muted-foreground">
+                       No orders yet. When customers place orders, you&#39;ll see them here in real time.
+                    </p>
+                  </div>
+                ) : (
+                  <ActivityList activities={activities} />
+                )}
               </div>
             </div>
           </div>

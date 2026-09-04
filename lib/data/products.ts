@@ -49,6 +49,12 @@ export function getProductCategory(name: string): string | null {
   return null
 }
 
+export function isSuitProduct(product: { name?: string; category?: string }): boolean {
+  const n = (product?.name || "").toLowerCase()
+  const c = (product?.category || "").toLowerCase()
+  return n.includes("suit") || c === "ladies-suits" || c.includes("suit")
+}
+
 export function toProduct(db: DatabaseProduct): Product {
   return {
     id: db.id,
@@ -65,7 +71,7 @@ export function toProduct(db: DatabaseProduct): Product {
   }
 }
 
-export function toDatabaseProduct(product: Partial<Product> & { user_id: string; store_id?: string }): Omit<DatabaseProduct, 'created_at' | 'updated_at' | 'id'> {
+export function toDatabaseProduct(product: Partial<Product> & { user_id: string; store_id: string }): Omit<DatabaseProduct, 'created_at' | 'updated_at' | 'id'> {
   const priceStr = product.price || "0"
   const priceNum = parseFloat(priceStr.replace(/[^0-9.]/g, "")) || 0
   const stockNum = parseInt(product.stock || "0", 10) || 0
@@ -75,9 +81,13 @@ export function toDatabaseProduct(product: Partial<Product> & { user_id: string;
     imageUrl = `/${imageUrl}`
   }
 
+  if (!product.store_id) {
+    throw new Error("store_id is required when saving a product — cannot fall back to user_id")
+  }
+
   return {
     user_id: product.user_id,
-    store_id: product.store_id || product.user_id,
+    store_id: product.store_id,
     name: product.name || "",
     description: product.description || null,
     price: priceNum,

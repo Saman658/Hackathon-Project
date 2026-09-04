@@ -5,12 +5,10 @@ import * as React from "react"
 import { useParams, notFound } from "next/navigation"
 import { StoreNavbar } from "@/components/store/store-navbar"
 import { StoreHero } from "@/components/store/store-hero"
-import { CategoryGrid } from "@/components/store/category-grid"
 import { ProductGrid } from "@/components/store/product-grid"
 import { StoreFooter } from "@/components/store/store-footer"
 import type { Product } from "@/lib/data/products"
 import { useCart } from "@/components/store/cart-context"
-import { useSearchParams } from "next/navigation"
 
 interface StoreData {
   store: {
@@ -30,23 +28,12 @@ export default function DynamicStorePage() {
   const params = useParams()
   const slug = params.slug as string
   const { addToCart } = useCart()
-  const searchParams = useSearchParams()
 
   const [data, setData] = React.useState<StoreData | null>(null)
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
 
-  const selectedCategory = searchParams.get("category")
-
-  const filteredProducts = React.useMemo(() => {
-    let products = data?.products ?? []
-
-    if (selectedCategory) {
-      products = products.filter((p) => p.category === selectedCategory)
-    }
-
-    return products
-  }, [data?.products, selectedCategory])
+  const filteredProducts = data?.products ?? []
 
   React.useEffect(() => {
     async function load() {
@@ -102,31 +89,7 @@ export default function DynamicStorePage() {
       <StoreNavbar store={store} />
       <main>
         <StoreHero store={store} />
-        <CategoryGrid
-          storeSlug={store.slug}
-          categories={[
-            { name: "Ladies Shirts", image: "/categories/ladies-shirts.jpg", slug: "ladies-shirts" },
-            { name: "Ladies Suits", image: "/categories/ladies-suits.jpg", slug: "ladies-suits" },
-            { name: "Frocks", image: "/categories/frocks.jpg", slug: "frocks" },
-          ]}
-          activeCategory={selectedCategory}
-        />
-        {selectedCategory && (
-          <section className="py-4">
-            <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
-              <h2 className="text-xl font-semibold capitalize">
-                {selectedCategory.replace(/-/g, " ")}
-              </h2>
-              <a
-                href={`/store/${store.slug}`}
-                className="text-sm font-medium text-primary hover:underline"
-              >
-                Clear filter
-              </a>
-            </div>
-          </section>
-        )}
-        <section className="py-16">
+        <section id="products" className="py-16">
           <div className="max-w-7xl mx-auto px-6">
             <ProductGrid products={filteredProducts} onAddToCart={handleAddToCart} storeSlug={store.slug} />
           </div>

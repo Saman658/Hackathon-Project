@@ -10,6 +10,37 @@ async function main() {
   const MAHRUKH_USER_ID = 'cf2fc82a-790a-4fc7-8dae-2728ceae8ad1'
   const MAHRUKH_STORE_ID = 'd465ed93-a315-45d9-baab-617c2a577a6b'
 
+  // === VERIFY store_id ownership BEFORE any product move ===
+  console.log('=== Verifying store ownership ===')
+
+  const { data: sehrishStoreCheck, error: sehrishCheckError } = await supabase
+    .from('stores')
+    .select('id, user_id')
+    .eq('id', SEHRISH_STORE_ID)
+    .eq('user_id', SEHRISH_USER_ID)
+    .single()
+
+  if (sehrishCheckError || !sehrishStoreCheck) {
+    console.error(`ABORT: Store ${SEHRISH_STORE_ID} is NOT owned by user ${SEHRISH_USER_ID}.`)
+    console.error('No products were moved or created.')
+    return
+  }
+  console.log('Verified: Sehrish store owned by Sehrish user')
+
+  const { data: mahrukhStoreCheck, error: mahrukhCheckError } = await supabase
+    .from('stores')
+    .select('id, user_id')
+    .eq('id', MAHRUKH_STORE_ID)
+    .eq('user_id', MAHRUKH_USER_ID)
+    .single()
+
+  if (mahrukhCheckError || !mahrukhStoreCheck) {
+    console.error(`ABORT: Store ${MAHRUKH_STORE_ID} is NOT owned by user ${MAHRUKH_USER_ID}.`)
+    console.error('No products were moved or created.')
+    return
+  }
+  console.log('Verified: Mahrukh store owned by Mahrukh user')
+
   // 1) Update profiles
   console.log('=== Updating profiles ===')
   

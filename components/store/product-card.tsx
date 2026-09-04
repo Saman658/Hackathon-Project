@@ -6,7 +6,7 @@ import Link from "next/link"
 import { ShoppingCart } from "lucide-react"
 import { cn } from "@/components/ui/button"
 import type { Product } from "@/lib/data/products"
-import { parseStock } from "@/lib/data/products"
+import { parseStock, isSuitProduct } from "@/lib/data/products"
 
 interface ProductCardProps {
   product: Product
@@ -24,12 +24,24 @@ function ProductCardInner({ product, onAddToCart, className, storeSlug }: Produc
   return (
     <Card className={cn("flex flex-col overflow-hidden transition-all duration-200 hover:shadow-lg", className)}>
       <Link href={productHref} className="block">
-        <div className="h-[320px] w-full overflow-hidden bg-border-light">
+        <div
+          className={cn(
+            "w-full overflow-hidden bg-border-light",
+            isSuitProduct(product)
+              ? "flex h-[340px] w-full items-center justify-center"
+              : "h-[320px] w-full"
+          )}
+        >
           {product.image ? (
             <img
               src={product.image}
               alt={product.name}
-              className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
+              className={cn(
+                "transition-transform duration-300",
+                isSuitProduct(product)
+                  ? "max-h-full max-w-full object-contain"
+                  : "h-full w-full object-cover hover:scale-105"
+              )}
             />
           ) : (
             <div className="h-full w-full flex items-center justify-center text-muted-foreground text-sm">

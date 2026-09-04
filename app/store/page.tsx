@@ -4,13 +4,10 @@ import * as React from "react"
 
 import { StoreNavbar } from "@/components/store/store-navbar"
 import { StoreHero } from "@/components/store/store-hero"
-import { CategoryGrid } from "@/components/store/category-grid"
 import { ProductGrid } from "@/components/store/product-grid"
 import { StoreFooter } from "@/components/store/store-footer"
 import type { Product } from "@/lib/data/products"
 import { useCart } from "@/components/store/cart-context"
-import { useAuth } from "@/components/providers/auth-provider"
-import { useSearchParams } from "next/navigation"
 
 interface StoreData {
   store: {
@@ -28,21 +25,9 @@ interface StoreData {
 
 function StorePageClient({ data }: { data: StoreData }) {
   const { addToCart } = useCart()
-  const { user, profile } = useAuth()
-  const searchParams = useSearchParams()
 
   const store = data.store
-  const selectedCategory = searchParams.get("category")
-
-  const filteredProducts = React.useMemo(() => {
-    let products = data.products ?? []
-
-    if (selectedCategory) {
-      products = products.filter((p) => p.category === selectedCategory)
-    }
-
-    return products
-  }, [data.products, selectedCategory])
+  const filteredProducts = data.products ?? []
 
   const handleAddToCart = (product: Product) => {
     addToCart({
@@ -60,36 +45,12 @@ function StorePageClient({ data }: { data: StoreData }) {
         <section className="pt-8 pb-2">
           <div className="max-w-7xl mx-auto px-6 text-center">
             <p className="text-lg font-medium text-muted-foreground">
-              {profile?.name || user?.email?.split("@")[0] || "Store"}
+              {store.name}
             </p>
           </div>
         </section>
         <StoreHero store={store} ctaLabel="Store Assistant" ctaHref="/store/chat" />
-        <CategoryGrid
-          storeSlug={store.slug}
-          categories={[
-            { name: "Ladies Shirts", image: "/categories/ladies-shirts.jpg", slug: "ladies-shirts" },
-            { name: "Ladies Suits", image: "/categories/ladies-suits.jpg", slug: "ladies-suits" },
-            { name: "Frocks", image: "/categories/frocks.jpg", slug: "frocks" },
-          ]}
-          activeCategory={selectedCategory}
-        />
-        {selectedCategory && (
-          <section className="py-4">
-            <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
-              <h2 className="text-xl font-semibold capitalize">
-                {selectedCategory.replace(/-/g, " ")}
-              </h2>
-              <a
-                href={`/store/${store.slug}`}
-                className="text-sm font-medium text-primary hover:underline"
-              >
-                Clear filter
-              </a>
-            </div>
-          </section>
-        )}
-        <section className="py-16">
+        <section id="products" className="py-16">
           <div className="max-w-7xl mx-auto px-6">
             <ProductGrid products={filteredProducts} onAddToCart={handleAddToCart} storeSlug={store.slug} />
           </div>

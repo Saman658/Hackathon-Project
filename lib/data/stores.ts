@@ -97,6 +97,18 @@ export function generateStoreId(): string {
   return `store_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
 }
 
+export async function verifyStoreOwnership(storeId: string, userId: string): Promise<boolean> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from("stores")
+    .select("id")
+    .eq("id", storeId)
+    .eq("user_id", userId)
+    .single()
+
+  return !error && !!data
+}
+
 export function toSlug(value: string): string {
   return value
     .toLowerCase()

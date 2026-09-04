@@ -56,6 +56,18 @@ export async function getStoreOwnerId(storeId: string): Promise<string | null> {
   return data?.user_id || null
 }
 
+function generateOrderId(): string {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID()
+  }
+  const bytes = new Uint8Array(16)
+  crypto.getRandomValues(bytes)
+  bytes[6] = (bytes[6] & 0x0f) | 0x40
+  bytes[8] = (bytes[8] & 0x3f) | 0x80
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("")
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
+}
+
 export async function createOrderInSupabase(orderData: {
   storeId: string
   customer: Order["customer"]
@@ -69,9 +81,15 @@ export async function createOrderInSupabase(orderData: {
 
   const ownerId = await getStoreOwnerId(orderData.storeId)
 
-  const { data: order, error: orderError } = await supabase
+  const id = generateOrderId()
+  const accessToken = generateOrderId()
+  const createdAt = new Date().toISOString()
+
+  const { error: orderError } = await supabase
     .from("orders")
     .insert({
+      id,
+      access_token: accessToken,
       user_id: ownerId,
       store_id: orderData.storeId,
       customer_name: orderData.customer.fullName,
@@ -85,13 +103,11 @@ export async function createOrderInSupabase(orderData: {
       total: orderData.total,
       status: orderData.status,
     })
-    .select()
-    .single()
 
   if (orderError) throw orderError
 
   const itemsPayload = orderData.items.map((item) => ({
-    order_id: order.id,
+    order_id: id,
     product_id: item.productId,
     product_name: item.name,
     price: parseFloat(String(item.price).replace(/[^0-9.]/g, "")) || 0,
@@ -105,23 +121,23 @@ export async function createOrderInSupabase(orderData: {
   if (itemsError) throw itemsError
 
   return {
-    id: order.id,
-    storeId: order.store_id,
-    accessToken: order.access_token,
+    id,
+    storeId: orderData.storeId,
+    accessToken,
     customer: {
-      fullName: order.customer_name,
-      email: order.customer_email,
-      phone: order.customer_phone,
-      address: order.shipping_address,
-      city: order.city,
-      postalCode: order.postal_code,
+      fullName: orderData.customer.fullName,
+      email: orderData.customer.email,
+      phone: orderData.customer.phone,
+      address: orderData.customer.address,
+      city: orderData.customer.city,
+      postalCode: orderData.customer.postalCode,
     },
     items: orderData.items,
-    subtotal: order.subtotal,
-    shipping: order.shipping,
-    total: order.total,
-    status: order.status,
-    createdAt: order.created_at,
+    subtotal: orderData.subtotal,
+    shipping: orderData.shipping,
+    total: orderData.total,
+    status: orderData.status,
+    createdAt,
   }
 }
 

@@ -8,12 +8,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/components/providers/auth-provider"
-import { fetchOrdersFromSupabase, Order } from "@/lib/data/orders"
+import { Order } from "@/lib/data/orders"
+import { useStoreOrders } from "@/lib/hooks/use-store-orders"
 
 const statusStyles: Record<string, "success" | "warning" | "outline" | "default"> = {
   Completed: "success",
   Processing: "warning",
   Pending: "outline",
+  Cancelled: "default",
   Shipped: "default",
 }
 
@@ -102,29 +104,18 @@ function buildCsv(fullOrders: Order[]): string {
 
 export default function OrdersPage() {
   const { user } = useAuth()
-  const [orders, setOrders] = React.useState<ReturnType<typeof mapOrderToRow>[]>([])
-  const [fullOrders, setFullOrders] = React.useState<Order[]>([])
-  const [loading, setLoading] = React.useState(true)
+  const { orders, stats } = useStoreOrders(user?.id)
   const [exporting, setExporting] = React.useState(false)
   const [message, setMessage] = React.useState<{ type: "success" | "error" | "info"; text: string } | null>(null)
 
   const clearMessage = React.useCallback(() => setMessage(null), [])
 
-  React.useEffect(() => {
-    async function load() {
-      if (!user) return
-      const data = await fetchOrdersFromSupabase(user.id)
-      setFullOrders(data)
-      setOrders(data.map(mapOrderToRow))
-      setLoading(false)
-    }
-    load()
-  }, [user])
+  const tableRows = React.useMemo(() => orders.map(mapOrderToRow), [orders])
 
   async function handleExport() {
     if (exporting) return
 
-    if (fullOrders.length === 0) {
+    if (orders.length === 0) {
       setMessage({ type: "info", text: "There are no orders to export." })
       return
     }
@@ -133,7 +124,7 @@ export default function OrdersPage() {
     clearMessage()
 
     try {
-      const csv = buildCsv(fullOrders)
+      const csv = buildCsv(orders)
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
       const url = URL.createObjectURL(blob)
 
@@ -148,7 +139,7 @@ export default function OrdersPage() {
       document.body.removeChild(link)
       URL.revokeObjectURL(url)
 
-      setMessage({ type: "success", text: `Exported ${fullOrders.length} order${fullOrders.length === 1 ? "" : "s"} to ${filename}.` })
+      setMessage({ type: "success", text: `Exported ${orders.length} order${orders.length === 1 ? "" : "s"} to ${filename}.` })
     } catch {
       setMessage({ type: "error", text: "Failed to export orders. Please try again." })
     } finally {
@@ -192,25 +183,25 @@ export default function OrdersPage() {
               <Card>
                 <CardContent className="p-6">
                   <p className="text-sm text-muted-foreground mb-1">Total Orders</p>
-                  <p className="text-2xl font-bold">{orders.length}</p>
+                  <p className="text-2xl font-bold">{tableRows.length}</p>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="p-6">
                   <p className="text-sm text-muted-foreground mb-1">Completed</p>
-                  <p className="text-2xl font-bold text-success">{orders.filter((o) => o.status === "Completed").length}</p>
+                  <p className="text-2xl font-bold text-success">{tableRows.filter((o) => o.status === "Completed").length}</p>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="p-6">
                   <p className="text-sm text-muted-foreground mb-1">Processing</p>
-                  <p className="text-2xl font-bold text-warning">{orders.filter((o) => o.status === "Processing").length}</p>
+                  <p className="text-2xl font-bold text-warning">{tableRows.filter((o) => o.status === "Processing").length}</p>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="p-6">
                   <p className="text-sm text-muted-foreground mb-1">Pending</p>
-                  <p className="text-2xl font-bold text-muted-foreground">{orders.filter((o) => o.status === "Pending").length}</p>
+                  <p className="text-2xl font-bold text-muted-foreground">{tableRows.filter((o) => o.status === "Pending").length}</p>
                 </CardContent>
               </Card>
             </div>
@@ -228,27 +219,27 @@ export default function OrdersPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {loading ? (
+                  {stats.loading ? (
                     <TableRow>
                       <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                         Loading orders...
                       </TableCell>
                     </TableRow>
-                  ) : orders.length === 0 ? (
+                  ) : tableRows.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                        No orders found.
+                        No orders yet. Once customers place orders, they will appear here in real time.
                       </TableCell>
                     </TableRow>
                   ) : (
-                    orders.map((order) => (
+                    tableRows.map((order) => (
                       <TableRow key={order.id}>
                         <TableCell className="font-medium">{order.id}</TableCell>
                         <TableCell>{order.customer}</TableCell>
                         <TableCell>{order.items}</TableCell>
                         <TableCell>{order.total}</TableCell>
                         <TableCell>
-                          <Badge variant={statusStyles[order.status]}>{order.status}</Badge>
+                          <Badge variant={statusStyles[order.status] || "default"}>{order.status}</Badge>
                         </TableCell>
                         <TableCell className="text-muted-foreground">{order.date}</TableCell>
                       </TableRow>

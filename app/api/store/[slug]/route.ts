@@ -32,6 +32,15 @@ export async function GET(
     return NextResponse.json({ error: productsError.message }, { status: 500 })
   }
 
+  const safeProducts = (products || []).filter((row) => row.store_id === store.id)
+  const mapped = safeProducts.map((row) => toProduct(row as Parameters<typeof toProduct>[0]))
+
+  if (process.env.NODE_ENV !== "production") {
+    console.log(
+      `[storefront] slug=${slug} store_id=${store.id} returned ${mapped.length} products`
+    )
+  }
+
   return NextResponse.json({
     store: {
       id: store.id,
@@ -43,6 +52,6 @@ export async function GET(
       heroDescription: store.hero_description,
       updatedAt: store.updated_at,
     },
-    products: (products || []).map((row) => toProduct(row as Parameters<typeof toProduct>[0])),
+    products: mapped,
   }, { headers: { "Cache-Control": "no-store" } })
 }

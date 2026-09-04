@@ -3,10 +3,11 @@
 import * as React from "react"
 import { Sidebar } from "@/components/layout/sidebar"
 import { Header } from "@/components/layout/header"
-import { AnalyticsCard, defaultCards } from "@/components/dashboard/analytics-card"
+import { AnalyticsCard } from "@/components/dashboard/analytics-card"
 import { ChartPlaceholder } from "@/components/dashboard/chart-placeholder"
 import { useAuth } from "@/components/providers/auth-provider"
-import { fetchOrdersFromSupabase } from "@/lib/data/orders"
+import { useStoreOrders } from "@/lib/hooks/use-store-orders"
+import { DollarSign, ShoppingCart, Clock, TrendingUp } from "lucide-react"
 
 function formatCurrency(value: number): string {
   return `$${value.toFixed(2)}`
@@ -14,50 +15,41 @@ function formatCurrency(value: number): string {
 
 export default function RevenuePage() {
   const { user } = useAuth()
-  const [revenue, setRevenue] = React.useState(0)
-  const [totalOrders, setTotalOrders] = React.useState(0)
-  const [pendingOrders, setPendingOrders] = React.useState(0)
+  const { stats } = useStoreOrders(user?.id)
 
-  React.useEffect(() => {
-    async function load() {
-      if (!user) return
-      const data = await fetchOrdersFromSupabase(user.id)
-      const completed = data.filter((o) => o.status === "Completed")
-      setRevenue(completed.reduce((sum, order) => sum + order.total, 0))
-      setTotalOrders(completed.length)
-      setPendingOrders(data.filter((o) => o.status === "Pending").length)
-    }
-    load()
-  }, [user])
-
-  const cards = [
-    {
-      title: "Total Revenue",
-      value: formatCurrency(revenue),
-      change: revenue > 0 ? "+100%" : "0%",
-      trend: revenue > 0 ? "up" as const : "neutral" as const,
-      icon: defaultCards[0].icon,
-    },
-    {
-      title: "Completed Orders",
-      value: totalOrders.toString(),
-      change: totalOrders > 0 ? "+100%" : "0%",
-      trend: totalOrders > 0 ? "up" as const : "neutral" as const,
-      icon: defaultCards[2].icon,
-    },
-    {
-      title: "Average Order Value",
-      value: totalOrders > 0 ? formatCurrency(revenue / totalOrders) : "$0.00",
-      change: totalOrders > 0 ? "+100%" : "0%",
-      trend: totalOrders > 0 ? "up" as const : "neutral" as const,
-      icon: defaultCards[0].icon,
-    },
-    {
-      title: "Pending Orders",
-      value: pendingOrders.toString(),
-      icon: defaultCards[2].icon,
-    },
-  ]
+  const cards = React.useMemo(
+    () => [
+      {
+        title: "Total Revenue",
+        value: formatCurrency(stats.revenue),
+        change: stats.revenue > 0 ? "+100%" : "0%",
+        trend: stats.revenue > 0 ? ("up" as const) : ("neutral" as const),
+        icon: <DollarSign className="h-5 w-5" />,
+      },
+      {
+        title: "Completed Orders",
+        value: stats.completed.toString(),
+        change: stats.completed > 0 ? "+100%" : "0%",
+        trend: stats.completed > 0 ? ("up" as const) : ("neutral" as const),
+        icon: <ShoppingCart className="h-5 w-5" />,
+      },
+      {
+        title: "Average Order Value",
+        value: stats.completed > 0 ? formatCurrency(stats.averageOrderValue) : "$0.00",
+        change: stats.completed > 0 ? "+100%" : "0%",
+        trend: stats.completed > 0 ? ("up" as const) : ("neutral" as const),
+        icon: <TrendingUp className="h-5 w-5" />,
+      },
+      {
+        title: "Pending Orders",
+        value: stats.pending.toString(),
+        change: stats.pending > 0 ? `${stats.pending} pending` : "0",
+        trend: stats.pending > 0 ? ("up" as const) : ("neutral" as const),
+        icon: <Clock className="h-5 w-5" />,
+      },
+    ],
+    [stats]
+  )
 
   return (
     <div className="flex min-h-screen bg-background">

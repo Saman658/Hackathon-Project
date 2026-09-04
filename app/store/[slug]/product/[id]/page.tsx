@@ -8,8 +8,9 @@ import { StoreFooter } from "@/components/store/store-footer"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { cn } from "@/components/ui/button"
 import type { Product } from "@/lib/data/products"
-import { parseStock } from "@/lib/data/products"
+import { parseStock, isSuitProduct } from "@/lib/data/products"
 import { useCart } from "@/components/store/cart-context"
 import { ArrowLeft, Minus, Plus } from "lucide-react"
 import Link from "next/link"
@@ -45,7 +46,7 @@ export default function ProductDetailPage() {
   React.useEffect(() => {
     async function load() {
       try {
-        const res = await fetch(`/api/store/products/${productId}?storeSlug=${encodeURIComponent(slug)}`)
+        const res = await fetch(`/api/store/products/${productId}?storeSlug=${encodeURIComponent(slug)}`, { cache: "no-store" })
         if (!res.ok) {
           if (res.status === 404) {
             notFound()
@@ -155,12 +156,12 @@ export default function ProductDetailPage() {
         <Card>
           <div className="grid grid-cols-1 md:grid-cols-2">
             <div className="flex flex-col gap-4 p-4">
-              <div className="aspect-square w-full overflow-hidden bg-border-light rounded-xl">
+              <div className={cn("overflow-hidden bg-border-light rounded-xl", isSuitProduct(product) ? "flex aspect-[3/4] w-full items-center justify-center" : "aspect-square w-full")}>
                 {mainImage ? (
                   <img
                     src={mainImage}
                     alt={product.name}
-                    className="h-full w-full object-cover"
+                    className={cn("transition-transform duration-300", isSuitProduct(product) ? "max-h-full max-w-full object-contain" : "h-full w-full object-cover")}
                   />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-muted-foreground">
@@ -177,7 +178,7 @@ export default function ProductDetailPage() {
                       onClick={() => setSelectedImage(img)}
                       className={`h-16 w-16 shrink-0 rounded-lg border overflow-hidden bg-border-light transition-all duration-200 ${mainImage === img ? "border-accent ring-2 ring-accent/20" : "border-border hover:border-muted-foreground"}`}
                     >
-                      <img src={img} alt={`${product.name} ${idx + 1}`} className="h-full w-full object-cover" />
+                      <img src={img} alt={`${product.name} ${idx + 1}`} className={cn("h-full w-full", isSuitProduct(product) ? "object-contain" : "object-cover")} />
                     </button>
                   ))}
                 </div>
@@ -214,21 +215,23 @@ export default function ProductDetailPage() {
                 </div>
 
                 <div className="mt-auto pt-8 border-t border-border">
-                  <div className="flex flex-col sm:flex-row flex-wrap items-center gap-3">
-                    <div className="flex items-center gap-3 shrink-0">
+                  <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch justify-center gap-3 w-full">
+                    <div className="flex items-center justify-center rounded-md border border-input bg-background overflow-hidden shrink-0 self-center sm:self-stretch">
                       <Button
-                        variant="outline"
+                        variant="ghost"
                         size="icon"
+                        className="rounded-none border-0 h-10 w-10"
                         onClick={decrement}
                         disabled={quantity <= 1 || isOutOfStock || isInactive}
                         aria-label="Decrease quantity"
                       >
                         <Minus className="h-4 w-4" />
                       </Button>
-                      <span className="w-12 text-center text-base font-medium">{quantity}</span>
+                      <span className="w-10 text-center text-base font-medium select-none border-x border-input h-10 flex items-center justify-center">{quantity}</span>
                       <Button
-                        variant="outline"
+                        variant="ghost"
                         size="icon"
+                        className="rounded-none border-0 h-10 w-10"
                         onClick={increment}
                         disabled={quantity >= stock || isOutOfStock || isInactive}
                         aria-label="Increase quantity"
@@ -237,19 +240,17 @@ export default function ProductDetailPage() {
                       </Button>
                     </div>
 
-                    <div className="flex flex-col sm:flex-row gap-3 flex-1 min-w-0 w-full sm:w-auto">
-                      <Button
-                        variant="outline"
-                        className="w-full sm:flex-1 min-w-0 whitespace-nowrap"
-                        onClick={handleAddToCart}
-                        disabled={!canAddToCart}
-                      >
-                        <span className="whitespace-nowrap">{added ? "Added to Cart" : isOutOfStock ? "Out of Stock" : isInactive ? "Unavailable" : "Add to Cart"}</span>
-                      </Button>
-                      <Button className="w-full sm:flex-1 min-w-0 whitespace-nowrap" onClick={handleOrderNow} disabled={!canAddToCart}>
-                        <span className="whitespace-nowrap">Order Now</span>
-                      </Button>
-                    </div>
+                    <Button
+                      variant="outline"
+                      className="h-10 px-5 whitespace-nowrap sm:flex-1 sm:min-w-[8rem] basis-full sm:basis-auto"
+                      onClick={handleAddToCart}
+                      disabled={!canAddToCart}
+                    >
+                      <span className="whitespace-nowrap">{added ? "Added to Cart" : isOutOfStock ? "Out of Stock" : isInactive ? "Unavailable" : "Add to Cart"}</span>
+                    </Button>
+                    <Button className="h-10 px-5 whitespace-nowrap sm:flex-1 sm:min-w-[8rem] basis-full sm:basis-auto" onClick={handleOrderNow} disabled={!canAddToCart}>
+                      <span className="whitespace-nowrap">Order Now</span>
+                    </Button>
                   </div>
                 </div>
               </div>

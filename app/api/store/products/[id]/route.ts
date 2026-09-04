@@ -2,6 +2,8 @@ import { NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/service"
 import { toProduct } from "@/lib/data/products"
 
+export const dynamic = "force-dynamic"
+
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -48,5 +50,5 @@ export async function GET(
       heroDescription: store.hero_description,
       updatedAt: store.updated_at,
     },
-  })
+  }, { headers: { "Cache-Control": "no-store" } })
 }
