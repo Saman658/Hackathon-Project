@@ -8,97 +8,58 @@ const supabase = createClient(url, key)
 const MAHRUKH_USER_ID = 'cf2fc82a-790a-4fc7-8dae-2728ceae8ad1'
 const MAHRUKH_STORE_ID = 'd465ed93-a315-45d9-baab-617c2a577a6b'
 
+const URL_BY_SKU = {
+  'MAHRUKH-BEYOND-001': 'https://beyonddetail.pk/cdn/shop/files/ChatGPTImageMar24_2026_10_21_11PM.png?v=1775911071&width=1100',
+  'MAHRUKH-LAWN-001': 'https://afiay.com/cdn/shop/files/Price6700t.png?v=1786286662&width=3840',
+  'MAHRUKH-HAMZA-001': 'https://www.limelight.pk/cdn/shop/files/U4923SU-3PC-227-3PieceLawnSuit_Unstitched_3.jpg?v=1783404694&width=1445',
+  'MAHRUKH-CHEVRON-001': 'https://miandadfabrics.com/cdn/shop/files/1_661b7bd6-c327-49e0-a48c-01b37b8413e4.jpg?v=1784874932&width=533',
+}
+
 async function main() {
-  console.log('=== Removing old Mahrukh Store products ===')
-
-  const oldProductIds = [
-    '1b0ddcd2-f529-4b35-af40-ebae5062fe33', // Ladies Suit
-    'd05f2705-bff3-4545-9833-a9c492ff9530', // Ladies Shirt
-    '2a364aa3-f957-4814-902f-c1211c3b0f10', // Frock
-  ]
-
-  for (const id of oldProductIds) {
-    const { error } = await supabase
-      .from('products')
-      .delete()
-      .eq('id', id)
-      .eq('store_id', MAHRUKH_STORE_ID)
-    if (error) {
-      console.error(`Failed to delete product ${id}:`, error)
-    } else {
-      console.log(`Deleted product ${id}`)
-    }
-  }
-
-  console.log('\n=== Adding new Mahrukh Store products ===')
-
-  const newProducts = [
-    {
-      name: 'Digital Printed Lawn 2-Piece Suite',
-      sku: 'MAHRUKH-LAWN-001',
-      image_url: 'https://shoprex.com/images/srproducts/large/digital-printed-lawn-shirt-with-trouser-2-pec-suite-unstitched-drl-1388_46536.jpg',
-      price: 89.00,
-      stock: 50,
-      status: 'Active',
-      description: 'Digital printed lawn fabric 2-piece unstitched suit featuring a shirt with trouser. Crafted from premium breathable lawn fabric with all-over digital print on front, back, sleeves and daman. Perfect for spring and summer wear, offering comfort and elegance for casual and semi-formal occasions.',
-    },
-    {
-      name: 'Chevron 2 Piece Ladies Suit',
-      sku: 'MAHRUKH-CHEVRON-001',
-      image_url: 'https://beyonddetail.pk/cdn/shop/files/ChatGPTImageMar24_2026_09_32_49PM.png?v=1774376500',
-      price: 59.99,
-      stock: 30,
-      status: 'Active',
-      description: 'Stylish all-over chevron print 2-piece stitched ladies suit. Made with high-quality China imported poly cotton fabric featuring premium sublimation printing for vibrant, fade-resistant colors. Soft, breathable, and lightweight with a comfortable fit. Perfect for casual wear, office, shopping, family gatherings, and semi-formal occasions.',
-    },
-    {
-      name: 'Hamza Ismail 3PC Printed Lawn Suit',
-      sku: 'MAHRUKH-HAMZA-001',
-      image_url: 'https://dilkash.com.pk/wp-content/uploads/2026/04/3PC-Unstitched-Printed-Lawn-Suit-–-DFC013-300x450.webp',
-      price: 42.50,
-      stock: 25,
-      status: 'Active',
-      description: 'Premium 3-piece unstitched printed lawn suit from the Hamza Ismail collection. Features elegant digital prints on high-quality lawn fabric. Includes shirt, trouser, and dupatta for a complete outfit. Designed for summer wear with beautiful patterns, comfortable fit, and refined tailoring suitable for everyday elegance and special occasions.',
-    },
-  ]
-
-  for (const product of newProducts) {
+  console.log('=== Setting Mahrukh storefront images (idempotent, by SKU) ===')
+  for (const [sku, image_url] of Object.entries(URL_BY_SKU)) {
     const { data, error } = await supabase
       .from('products')
-      .insert({
-        user_id: MAHRUKH_USER_ID,
-        store_id: MAHRUKH_STORE_ID,
-        name: product.name,
-        sku: product.sku,
-        image_url: product.image_url,
-        price: product.price,
-        stock: product.stock,
-        status: product.status,
-        description: product.description,
-      })
-      .select('id, name, sku, price, stock, status, image_url')
-      .single()
+      .update({ image_url })
+      .eq('sku', sku)
+      .eq('store_id', MAHRUKH_STORE_ID)
+      .eq('user_id', MAHRUKH_USER_ID)
+      .select('id, name, sku, image_url')
+      .maybeSingle()
 
     if (error) {
-      console.error(`Failed to insert product ${product.name}:`, error)
+      console.error(`Error updating ${sku}:`, error.message)
+    } else if (!data) {
+      console.log(`SKIP ${sku}: no matching product in Mahrukh store`)
     } else {
-      console.log(`Inserted: ${data.name} [sku=${data.sku}] price=$${data.price} stock=${data.stock}`)
+      console.log(`Updated [${data.sku}] ${data.name} -> ${data.image_url}`)
     }
   }
 
   console.log('\n=== Verification ===')
-  const { data: finalProducts } = await supabase
+  const { data: final, error } = await supabase
     .from('products')
-    .select('id, name, sku, price, stock, status, image_url, description')
+    .select('id, name, sku, price, stock, status, image_url')
     .eq('store_id', MAHRUKH_STORE_ID)
-    .order('created_at', { ascending: false })
+    .order('created_at', { ascending: true })
 
-  console.log(`\nMahrukh Store (${finalProducts?.length || 0} products):`)
-  for (const p of finalProducts || []) {
+  if (error) {
+    console.error('Error verifying:', error.message)
+    return
+  }
+
+  console.log(`Mahrukh Store (${final?.length || 0} products):`)
+  for (const p of final || []) {
     console.log(`  - ${p.name} [sku=${p.sku}] price=$${p.price} stock=${p.stock} status=${p.status}`)
     console.log(`    image: ${p.image_url}`)
-    console.log(`    desc: ${p.description?.slice(0, 100)}...`)
   }
+
+  const desired = Object.values(URL_BY_SKU)
+  const allMatch = desired.every((u) => (final || []).some((p) => p.image_url === u))
+  console.log(`\n${allMatch ? 'OK' : 'MISSING'}: All 4 URLs are present in DB.`)
 }
 
-main().catch(e => { console.error(e); process.exit(1) })
+main().catch((e) => {
+  console.error(e)
+  process.exit(1)
+})

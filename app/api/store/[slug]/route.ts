@@ -11,14 +11,22 @@ export async function GET(
   const { slug } = await params
   const supabase = createServiceClient()
 
-  const { data: store, error: storeError } = await supabase
+  const { data: stores, error: storeError } = await supabase
     .from("stores")
     .select("*")
     .eq("slug", slug)
-    .single()
+    .order("created_at", { ascending: false })
 
-  if (storeError || !store) {
+  if (storeError || !stores || stores.length === 0) {
     return NextResponse.json({ error: "Store not found", needsStore: true }, { status: 404 })
+  }
+
+  const store = stores[0]
+
+  if (process.env.NODE_ENV !== "production") {
+    console.log(
+      `[storefront] slug=${slug} store_id=${store.id.slice(0, 8)}`
+    )
   }
 
   const { data: products, error: productsError } = await supabase

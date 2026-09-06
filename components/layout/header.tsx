@@ -46,6 +46,7 @@ function HeaderInner({ className }: HeaderProps) {
     if (pathname === "/dashboard/orders") return "Orders"
     if (pathname === "/dashboard/products") return "Products"
     if (pathname === "/dashboard/problems") return "Problems"
+    if (pathname === "/dashboard/ai-insights") return "AI Insights"
     return "Dashboard"
   }
 

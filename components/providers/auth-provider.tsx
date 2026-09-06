@@ -37,13 +37,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const initializedRef = React.useRef(false)
 
   const refreshProfile = async () => {
-    const currentUser = await getCurrentUser()
-    setUser(currentUser ? { id: currentUser.id, email: currentUser.email ?? undefined } : null)
-    
-    if (currentUser) {
-      const userProfile = await getProfile()
-      setProfile(userProfile)
-    } else {
+    try {
+      const currentUser = await getCurrentUser()
+      setUser(currentUser ? { id: currentUser.id, email: currentUser.email ?? undefined } : null)
+      
+      if (currentUser) {
+        const userProfile = await getProfile()
+        setProfile(userProfile)
+      } else {
+        setProfile(null)
+      }
+    } catch {
+      setUser(null)
       setProfile(null)
     }
   }
@@ -63,16 +68,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return
       
-      setUser(session?.user ? { id: session.user.id, email: session.user.email ?? undefined } : null)
-      
-      if (session?.user) {
-        const userProfile = await getProfile()
-        if (mounted) setProfile(userProfile)
-      } else {
-        if (mounted) setProfile(null)
+      try {
+        setUser(session?.user ? { id: session.user.id, email: session.user.email ?? undefined } : null)
+        
+        if (session?.user) {
+          const userProfile = await getProfile()
+          if (mounted) setProfile(userProfile)
+        } else {
+          if (mounted) setProfile(null)
+        }
+      } catch {
+        setUser(null)
+        setProfile(null)
+      } finally {
+        if (mounted) setLoading(false)
       }
-      
-      setLoading(false)
     })
 
     return () => {

@@ -2,8 +2,12 @@ import { createClient } from './client'
 
 export async function getCurrentUser() {
   const supabase = createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  return user
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    return user
+  } catch {
+    return null
+  }
 }
 
 export async function getProfile() {

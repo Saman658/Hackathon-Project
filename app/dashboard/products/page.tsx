@@ -72,13 +72,20 @@ export default function ProductsPage() {
 
   const loadProducts = React.useCallback(async () => {
     if (!user) return
+    if (userStores.length === 0) {
+      setProducts([])
+      setLoading(false)
+      return
+    }
     const supabase = createClient()
+    const ownedStoreIds = userStores.map((s) => s.id)
+
     let query = supabase
       .from("products")
       .select("*")
-      .eq("user_id", user.id)
+      .in("store_id", ownedStoreIds)
 
-    if (storeId) {
+    if (storeId && ownedStoreIds.includes(storeId)) {
       query = query.eq("store_id", storeId)
     }
 
@@ -92,7 +99,7 @@ export default function ProductsPage() {
       setError(null)
     }
     setLoading(false)
-  }, [user, storeId])
+  }, [user, storeId, userStores])
 
   const loadStores = React.useCallback(async () => {
     if (!user) return

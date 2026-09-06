@@ -38,7 +38,7 @@ export default function DynamicStorePage() {
   React.useEffect(() => {
     async function load() {
       try {
-        const res = await fetch(`/api/store/${slug}`, { cache: "no-store" })
+        const res = await fetch(`/api/store/${slug}?t=${Date.now()}`, { cache: "no-store" })
         if (!res.ok) {
           if (res.status === 404) {
             notFound()
