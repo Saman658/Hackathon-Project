@@ -7,9 +7,8 @@ import { AnalyticsCard } from "@/components/dashboard/analytics-card"
 import { ChartPlaceholder } from "@/components/dashboard/chart-placeholder"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { useAuth } from "@/components/providers/auth-provider"
+import { useStores } from "@/lib/stores-context"
 import { useStoreOrders } from "@/lib/hooks/use-store-orders"
-import { createClient } from "@/lib/supabase/client"
 import { DollarSign, ShoppingCart, Package, Users, TrendingUp, AlertTriangle, Lightbulb } from "lucide-react"
 
 function formatCurrency(value: number): string {
@@ -17,24 +16,42 @@ function formatCurrency(value: number): string {
 }
 
 export default function AIInsightsPage() {
-  const { user } = useAuth()
-  const { orders, stats } = useStoreOrders(user?.id)
+  const { activeStoreId } = useStores()
+  const { orders, stats } = useStoreOrders(activeStoreId)
   const [productCount, setProductCount] = React.useState(0)
-  const [loading, setLoading] = React.useState(true)
 
   React.useEffect(() => {
+    let active = true
+
     async function loadProducts() {
-      if (!user) return
-      const supabase = createClient()
-      const { count } = await supabase
-        .from("products")
-        .select("*", { count: "exact", head: true })
-        .eq("user_id", user.id)
-      setProductCount(count || 0)
-      setLoading(false)
+      if (!activeStoreId) {
+        setProductCount(0)
+        return
+      }
+
+      // Counted through the store-scoped server route, not the browser client.
+      // `products` RLS selects on `auth.uid() = user_id`, so a browser read
+      // returns 0 for any store the signed-in account manages but does not own
+      // (e.g. Mahrukh's store while the admin is signed in).
+      try {
+        const res = await fetch(
+          `/api/dashboard/products?storeId=${encodeURIComponent(activeStoreId)}`,
+          { cache: "no-store" }
+        )
+        const json = await res.json()
+        if (!active) return
+        setProductCount(Array.isArray(json.products) ? json.products.length : 0)
+      } catch {
+        if (active) setProductCount(0)
+      }
     }
+
     loadProducts()
-  }, [user])
+
+    return () => {
+      active = false
+    }
+  }, [activeStoreId])
 
   const completedOrders = React.useMemo(
     () => orders.filter((o) => o.status === "Completed"),

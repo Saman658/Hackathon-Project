@@ -26,35 +26,66 @@ interface StoreData {
 
 export default function DynamicStorePage() {
   const params = useParams()
-  const slug = params.slug as string
+  const slug = typeof params?.slug === "string" ? params.slug : ""
   const { addToCart } = useCart()
 
   const [data, setData] = React.useState<StoreData | null>(null)
+  const [loadedSlug, setLoadedSlug] = React.useState<string | null>(null)
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
 
-  const filteredProducts = data?.products ?? []
+  const isCurrentStore = loadedSlug === slug
+  const filteredProducts = isCurrentStore ? data?.products ?? [] : []
 
   React.useEffect(() => {
+    if (!slug) {
+      return
+    }
+
+    const controller = new AbortController()
+    let active = true
+
+    setLoading(true)
+    setError(null)
+    setData(null)
+    setLoadedSlug(null)
+
     async function load() {
       try {
-        const res = await fetch(`/api/store/${slug}?t=${Date.now()}`, { cache: "no-store" })
+        const res = await fetch(`/api/store/${encodeURIComponent(slug)}?t=${Date.now()}`, {
+          cache: "no-store",
+          signal: controller.signal,
+        })
+        const json = await res.json()
+        if (!active) {
+          return
+        }
         if (!res.ok) {
           if (res.status === 404) {
             notFound()
             return
           }
-          throw new Error("Failed to load store")
+          throw new Error(json.error || "Failed to load store")
         }
-        const json = await res.json()
         setData(json)
+        setLoadedSlug(slug)
       } catch (err) {
+        if (!active || (err instanceof DOMException && err.name === "AbortError")) {
+          return
+        }
         setError(err instanceof Error ? err.message : "Failed to load store")
       } finally {
-        setLoading(false)
+        if (active) {
+          setLoading(false)
+        }
       }
     }
     load()
+
+    return () => {
+      active = false
+      controller.abort()
+    }
   }, [slug])
 
   if (loading) {
@@ -65,7 +96,7 @@ export default function DynamicStorePage() {
     )
   }
 
-  if (error || !data) {
+  if (error || !data || !isCurrentStore) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <p className="text-error">{error || "Store not found"}</p>

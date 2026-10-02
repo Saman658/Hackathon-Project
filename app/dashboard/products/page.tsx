@@ -10,12 +10,9 @@ import { Input } from "@/components/ui/input"
 import { Modal, ModalContent, ModalHeader, ModalTitle, ModalBody, ModalFooter } from "@/components/ui/modal"
 import { EmptyState } from "@/components/ui/empty-state"
 import type { Product } from "@/lib/data/products"
-import { toProduct, toDatabaseProduct } from "@/lib/data/products"
-import { getStoresFromSupabase, verifyStoreOwnership } from "@/lib/data/stores"
 import { Pencil, Trash2 } from "lucide-react"
 import { useAuth } from "@/components/providers/auth-provider"
-import { createClient } from "@/lib/supabase/client"
-import type { DatabaseProduct } from "@/lib/data/products"
+import { useStores } from "@/lib/stores-context"
 
 const emptyStateIcon = (
   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -36,6 +33,7 @@ const placeholderIcon = (
 
 export default function ProductsPage() {
   const { user } = useAuth()
+  const { stores, activeStoreId } = useStores()
   const [searchQuery, setSearchQuery] = React.useState("")
   const [modalOpen, setModalOpen] = React.useState(false)
   const [products, setProducts] = React.useState<Product[]>([])
@@ -46,6 +44,7 @@ export default function ProductsPage() {
   const [deleting, setDeleting] = React.useState(false)
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
+  const [saveError, setSaveError] = React.useState<string | null>(null)
   const [saving, setSaving] = React.useState(false)
 
   const [name, setName] = React.useState("")
@@ -55,88 +54,114 @@ export default function ProductsPage() {
   const [image, setImage] = React.useState<string | null>(null)
   const [images, setImages] = React.useState<string[]>([])
   const [status, setStatus] = React.useState("Active")
-  const [storeId, setStoreId] = React.useState("")
   const [active, setActive] = React.useState(true)
-  const [userStores, setUserStores] = React.useState<{ id: string; name: string; slug: string }[]>([])
 
   const [errors, setErrors] = React.useState<{ name?: string; price?: string; stock?: string }>({})
 
+  // `stores` is already the set of stores this account may manage (own stores,
+  // or all stores for an admin), resolved centrally in lib/stores-context.tsx
+  // and re-validated whenever the signed-in account changes. No per-page
+  // ownership filtering is needed and a previous account's store can never
+  // leak into this list.
+  const userStores = React.useMemo(
+    () => stores.map((s) => ({ id: s.id, name: s.name, slug: s.slug })),
+    [stores]
+  )
+
+  const activeStoreName = React.useMemo(
+    () => userStores.find((s) => s.id === activeStoreId)?.name ?? "your store",
+    [userStores, activeStoreId]
+  )
+
+  const storeProducts = React.useMemo(() => {
+    if (!activeStoreId) return []
+    return products.filter((p) => p.storeId === activeStoreId)
+  }, [products, activeStoreId])
+
   const filteredProducts = React.useMemo(() => {
     const query = searchQuery.toLowerCase().trim()
-    if (!query) return products
-    return products.filter((p) => {
+    if (!query) return storeProducts
+    return storeProducts.filter((p) => {
       const haystack = `${p.name} ${p.sku} ${p.status}`.toLowerCase()
       return haystack.includes(query)
     })
-  }, [products, searchQuery])
+  }, [storeProducts, searchQuery])
 
-  const loadProducts = React.useCallback(async () => {
-    if (!user) return
-    if (userStores.length === 0) {
-      setProducts([])
-      setLoading(false)
-      return
-    }
-    const supabase = createClient()
-    const ownedStoreIds = userStores.map((s) => s.id)
-
-    let query = supabase
-      .from("products")
-      .select("*")
-      .in("store_id", ownedStoreIds)
-
-    if (storeId && ownedStoreIds.includes(storeId)) {
-      query = query.eq("store_id", storeId)
-    }
-
-    const { data, error } = await query.order("created_at", { ascending: false })
-
-    if (error) {
-      setError(error.message)
-    } else if (data) {
-      const mapped = data.map(toProduct)
-      setProducts(mapped)
-      setError(null)
-    }
-    setLoading(false)
-  }, [user, storeId, userStores])
-
-  const loadStores = React.useCallback(async () => {
-    if (!user) return
-    const allStores = await getStoresFromSupabase(user.id)
-    const myStores = allStores.filter((s) => s.userId === user.id)
-    setUserStores(myStores.map((s) => ({ id: s.id, name: s.name, slug: s.slug })))
-    setStoreId((prev) => {
-      if (myStores.length > 0 && !prev) {
-        return myStores[0].id
-      }
-      return prev
+  // Drop any cached product that does not belong to a store the current user
+  // owns, so the previous account's products cannot survive an account switch.
+  /* eslint-disable react-hooks/set-state-in-effect */
+  React.useEffect(() => {
+    setProducts((prev) => {
+      const allowed = new Set(userStores.map((s) => s.id))
+      const next = prev.filter((p) => allowed.has(p.storeId))
+      return next.length === prev.length ? prev : next
     })
-  }, [user])
+  }, [userStores])
 
-  /* eslint-disable react-hooks/set-state-in-effect */
+  // Clear per-account state when the signed-in user changes.
   React.useEffect(() => {
     if (!user) {
-      setProducts([])
-      setUserStores([])
-      setStoreId("")
       setLoading(false)
-      return
     }
-    loadProducts()
-  }, [loadProducts, user])
+  }, [user])
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  /* eslint-disable react-hooks/set-state-in-effect */
   React.useEffect(() => {
-    if (!user) {
-      setUserStores([])
-      setStoreId("")
-      return
+    let active = true
+
+    async function load() {
+      if (!user) {
+        return
+      }
+      if (!activeStoreId) {
+        if (active) {
+          setProducts([])
+          setError(null)
+          setLoading(false)
+        }
+        return
+      }
+
+      const requestedStoreId = activeStoreId
+
+      if (active) {
+        setLoading(true)
+      }
+
+      try {
+        const res = await fetch(`/api/dashboard/products?storeId=${encodeURIComponent(requestedStoreId)}`, { cache: "no-store" })
+        const json = await res.json()
+
+        if (!active) {
+          return
+        }
+
+        if (!res.ok) {
+          setError(json.error || "Failed to load products")
+          setProducts([])
+        } else if (json.products) {
+          setProducts(json.products.filter((p: Product) => p.storeId === requestedStoreId))
+          setError(null)
+        }
+      } catch (err) {
+        if (!active) {
+          return
+        }
+        setError(err instanceof Error ? err.message : "Failed to load products")
+        setProducts([])
+      } finally {
+        if (active) {
+          setLoading(false)
+        }
+      }
     }
-    loadStores()
-  }, [loadStores, user])
-  /* eslint-enable react-hooks/set-state-in-effect */
+
+    load()
+
+    return () => {
+      active = false
+    }
+  }, [user, activeStoreId])
 
   function loadForm(product?: Product) {
     if (product) {
@@ -147,7 +172,6 @@ export default function ProductsPage() {
       setImage(product.image)
       setImages(product.images || [])
       setStatus(product.status)
-      setStoreId(product.storeId || (userStores[0]?.id || ""))
       setActive(product.active)
     } else {
       setName("")
@@ -157,7 +181,6 @@ export default function ProductsPage() {
       setImage(null)
       setImages([])
       setStatus("Active")
-      setStoreId(userStores[0]?.id || "")
       setActive(true)
     }
     setErrors({})
@@ -165,12 +188,14 @@ export default function ProductsPage() {
 
   function openAddModal() {
     setEditingProduct(null)
+    setSaveError(null)
     loadForm()
     setModalOpen(true)
   }
 
   function openEditModal(product: Product) {
     setEditingProduct(product)
+    setSaveError(null)
     loadForm(product)
     setModalOpen(true)
   }
@@ -182,34 +207,47 @@ export default function ProductsPage() {
   }
 
   async function confirmDelete() {
-    if (!deleteProductId || !user) return
+    if (!deleteProductId) return
     const product = products.find((p) => p.id === deleteProductId)
     if (!product) return
-    setDeleting(true)
-    setDeleteError(null)
-    const supabase = createClient()
-    const { error } = await supabase
-      .from("products")
-      .delete()
-      .eq("id", deleteProductId)
-      .eq("user_id", user.id)
-      .eq("store_id", product.storeId)
 
-    if (error) {
-      setDeleteError(error.message)
-      setDeleting(false)
+    // Always sent, and the route ignores anything that does not match it, so a
+    // delete can never reach a product outside the currently selected store.
+    if (!activeStoreId || product.storeId !== activeStoreId) {
+      setDeleteError(`This product does not belong to ${activeStoreName}.`)
       return
     }
 
-    setProducts((prev) => prev.filter((p) => p.id !== deleteProductId))
-    setDeleteProductId(null)
-    setDeleteModalOpen(false)
-    setDeleting(false)
+    setDeleting(true)
+    setDeleteError(null)
+
+    try {
+      const res = await fetch(
+        `/api/dashboard/products/${encodeURIComponent(product.id)}?storeId=${encodeURIComponent(activeStoreId)}`,
+        { method: "DELETE", cache: "no-store" }
+      )
+      const json = await res.json().catch(() => ({}))
+
+      if (!res.ok) {
+        setDeleteError(json.error || "Failed to delete product")
+        setDeleting(false)
+        return
+      }
+
+      setProducts((prev) => prev.filter((p) => p.id !== deleteProductId))
+      setDeleteProductId(null)
+      setDeleteModalOpen(false)
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "Failed to delete product")
+    } finally {
+      setDeleting(false)
+    }
   }
 
   function handleOpenChange(open: boolean) {
     if (!open) {
       setEditingProduct(null)
+      setSaveError(null)
       loadForm()
     }
     setModalOpen(open)
@@ -226,75 +264,70 @@ export default function ProductsPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!validate() || !user) return
+    if (!validate()) return
 
-    if (!storeId || !userStores.some((s) => s.id === storeId)) {
-      setError("Please select a valid store. The selected store does not belong to you.")
+    if (!activeStoreId) {
+      setSaveError("No store selected. Choose a store first.")
       return
     }
 
-    const storeOwned = await verifyStoreOwnership(storeId, user.id)
-    if (!storeOwned) {
-      setError("Store verification failed. The selected store does not belong to you.")
+    // Editing is only offered for products already listed under the selected
+    // store; refuse rather than send a request the server would reject.
+    if (editingProduct && editingProduct.storeId !== activeStoreId) {
+      setSaveError(`This product does not belong to ${activeStoreName}.`)
       return
     }
 
     setSaving(true)
-    setError(null)
-    const supabase = createClient()
-    const dbProduct = toDatabaseProduct({
-      ...(editingProduct || {}),
-      user_id: user.id,
-      store_id: storeId,
+    setSaveError(null)
+
+    const isEditing = editingProduct !== null
+    const payload = {
       name: name.trim(),
       description: description.trim(),
       price: price.trim(),
       stock: stock.trim(),
       image: image?.trim() || "",
       status,
-    })
-
-    const buildProduct = (db: DatabaseProduct): Product => {
-      const base = toProduct(db)
-      return {
-        ...base,
-        storeId: db.store_id || base.storeId,
-        active,
-        images,
-      }
     }
 
-    if (editingProduct) {
-      const { data, error } = await supabase
-        .from("products")
-        .update(dbProduct)
-        .eq("id", editingProduct.id)
-        .eq("user_id", user.id)
-        .select("*")
-        .single()
+    const endpoint = isEditing
+      ? `/api/dashboard/products/${encodeURIComponent(editingProduct.id)}?storeId=${encodeURIComponent(activeStoreId)}`
+      : `/api/dashboard/products?storeId=${encodeURIComponent(activeStoreId)}`
 
-      if (!error && data) {
-        const updated = buildProduct(data as DatabaseProduct)
-        setProducts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)))
+    try {
+      const res = await fetch(endpoint, {
+        method: isEditing ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+        cache: "no-store",
+      })
+
+      const json = await res.json().catch(() => ({}))
+
+      if (!res.ok || !json.product) {
+        setSaveError(json.error || (isEditing ? "Failed to update product" : "Failed to create product"))
+        setSaving(false)
+        return
       }
-    } else {
-      const { data, error } = await supabase
-        .from("products")
-        .insert(dbProduct)
-        .select("*")
-        .single()
 
-      if (!error && data) {
-        const created = buildProduct(data as DatabaseProduct)
-        setProducts((prev) => [created, ...prev])
+      const saved: Product = { ...json.product, active, images }
+
+      if (isEditing) {
+        setProducts((prev) => prev.map((p) => (p.id === saved.id ? saved : p)))
+      } else {
+        setProducts((prev) => (saved.storeId === activeStoreId ? [saved, ...prev] : prev))
         setSearchQuery("")
       }
-    }
 
-    setEditingProduct(null)
-    loadForm()
-    setModalOpen(false)
-    setSaving(false)
+      setEditingProduct(null)
+      loadForm()
+      setModalOpen(false)
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Failed to save product")
+    } finally {
+      setSaving(false)
+    }
   }
 
   const isEditing = editingProduct !== null
@@ -312,7 +345,9 @@ export default function ProductsPage() {
                   <h1 className="text-2xl font-bold tracking-tight">Products</h1>
                   <Badge variant="default" size="sm">{filteredProducts.length} total</Badge>
                 </div>
-                <p className="text-sm text-muted-foreground mt-1">Manage your product catalog and inventory.</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Manage the product catalog for <span className="font-medium text-foreground">{activeStoreName}</span>.
+                </p>
               </div>
               <div className="flex items-center gap-3">
                 <Input
@@ -321,7 +356,7 @@ export default function ProductsPage() {
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full sm:w-64"
                 />
-                <Button onClick={openAddModal} className="shrink-0">Add Product</Button>
+                <Button onClick={openAddModal} className="shrink-0" disabled={!activeStoreId}>Add Product</Button>
               </div>
             </div>
 
@@ -358,59 +393,59 @@ export default function ProductsPage() {
                   </TableHeader>
                   <TableBody>
                     {filteredProducts.map((product) => (
-                      <TableRow key={product.id}>
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 rounded-lg border border-border overflow-hidden bg-border-light shrink-0">
-                              {product.image ? (
-                                <img
-                                  src={product.image}
-                                  alt={product.name}
-                                  className="h-full w-full object-cover"
-                                />
-                              ) : (
-                                <div className="h-full w-full flex items-center justify-center">
-                                  {placeholderIcon}
-                                </div>
-                              )}
+                        <TableRow key={product.id}>
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              <div className="h-10 w-10 rounded-lg border border-border overflow-hidden bg-border-light shrink-0">
+                                {product.image ? (
+                                  <img
+                                    src={product.image}
+                                    alt={product.name}
+                                    className="h-full w-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="h-full w-full flex items-center justify-center">
+                                    {placeholderIcon}
+                                  </div>
+                                )}
+                              </div>
+                              <span className="font-medium">{product.name}</span>
                             </div>
-                            <span className="font-medium">{product.name}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground font-mono text-xs">{product.sku}</TableCell>
-                        <TableCell>{product.price}</TableCell>
-                        <TableCell>{product.stock}</TableCell>
-                        <TableCell>
-                          <Badge variant={product.status === "Active" ? "success" : "outline"}>
-                            {product.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => openEditModal(product)}
-                              className="h-8 w-8 p-0"
-                              aria-label={`Edit ${product.name}`}
-                              title={`Edit ${product.name}`}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => openDeleteModal(product)}
-                              className="h-8 w-8 p-0 border-error text-error hover:bg-error-bg"
-                              aria-label={`Delete ${product.name}`}
-                              title={`Delete ${product.name}`}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground font-mono text-xs">{product.sku}</TableCell>
+                          <TableCell>{product.price}</TableCell>
+                          <TableCell>{product.stock}</TableCell>
+                          <TableCell>
+                            <Badge variant={product.status === "Active" ? "success" : "outline"}>
+                              {product.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => openEditModal(product)}
+                                className="h-8 w-8 p-0"
+                                aria-label={`Edit ${product.name}`}
+                                title={`Edit ${product.name}`}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => openDeleteModal(product)}
+                                className="h-8 w-8 p-0 border-error text-error hover:bg-error-bg"
+                                aria-label={`Delete ${product.name}`}
+                                title={`Delete ${product.name}`}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+</TableRow>
+                     ))}
                   </TableBody>
                 </Table>
               )}
@@ -426,6 +461,11 @@ export default function ProductsPage() {
           </ModalHeader>
           <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
             <ModalBody className="space-y-4 flex-1 overflow-y-auto min-h-0">
+              {saveError && (
+                <div className="rounded-xl border border-error/30 bg-error-bg px-4 py-3">
+                  <p className="text-sm text-error">{saveError}</p>
+                </div>
+              )}
               <div>
                 <label className="text-sm font-medium text-foreground mb-1.5 block">Product Name</label>
                 <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Enter product name" error={errors.name} />
@@ -468,15 +508,12 @@ export default function ProductsPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium text-foreground mb-1.5 block">Store</label>
-                  <select
-                    value={storeId}
-                    onChange={(e) => setStoreId(e.target.value)}
-                    className="flex w-full rounded-xl border border-border bg-transparent h-11 px-4 text-base focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-all duration-200"
-                  >
-                    {userStores.map((store) => (
-                      <option key={store.id} value={store.id}>{store.name}</option>
-                    ))}
-                  </select>
+                  <p className="flex h-11 w-full items-center rounded-xl border border-border bg-border-light px-4 text-base text-foreground">
+                    {activeStoreName}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1.5">
+                    {isEditing ? "This product stays in its current store." : `This product is saved to ${activeStoreName}. Switch stores from the sidebar to change this.`}
+                  </p>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-foreground mb-1.5 block">Active</label>

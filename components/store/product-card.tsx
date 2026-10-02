@@ -19,7 +19,7 @@ function ProductCardInner({ product, onAddToCart, className, storeSlug }: Produc
   const stock = parseStock(product.stock)
   const isOutOfStock = stock === 0
   const displayStock = isOutOfStock ? "Out of Stock" : "In Stock"
-  const productHref = storeSlug ? `/store/${storeSlug}/product/${product.id}` : `/store/product/${product.id}`
+  const productHref = storeSlug ? `/store/${storeSlug}/product/${product.slug}` : `/store/product/${product.slug}`
 
   return (
     <Card className={cn("flex flex-col overflow-hidden transition-all duration-200 hover:shadow-lg", className)}>

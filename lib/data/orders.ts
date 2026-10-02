@@ -141,7 +141,7 @@ export async function createOrderInSupabase(orderData: {
   }
 }
 
-type SupabaseOrderRow = {
+export type SupabaseOrderRow = {
   id: string
   store_id: string
   customer_name: string
@@ -158,7 +158,7 @@ type SupabaseOrderRow = {
   order_items?: DatabaseOrderItem[]
 }
 
-function mapSupabaseOrderRow(order: SupabaseOrderRow): Order {
+export function mapSupabaseOrderRow(order: SupabaseOrderRow): Order {
   return {
     id: order.id,
     storeId: order.store_id,
@@ -205,38 +205,34 @@ export async function fetchOrderFromSupabase(
   }
 }
 
-export async function fetchOrdersFromSupabase(userId: string): Promise<Order[]> {
-  const supabase = createClient()
+// Orders are always resolved by the *selected store*, never by the signed-in
+// user. `public.orders` RLS is `auth.uid() = user_id`, so a browser read can
+// only ever return the session owner's rows; the store-scoped server route
+// applies the same authorization as the products route and returns the
+// selected store's orders.
+export async function fetchOrdersForStore(storeId: string | null | undefined): Promise<Order[]> {
+  if (!storeId) {
+    return []
+  }
 
-  const { data: ordersData, error } = await supabase
-    .from("orders")
-    .select("*, order_items(*)")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false })
+  try {
+    const res = await fetch(`/api/dashboard/orders?storeId=${encodeURIComponent(storeId)}`, {
+      cache: "no-store",
+    })
 
-  if (error || !ordersData) return []
+    if (!res.ok) {
+      return []
+    }
 
-  return ordersData.map((order) => ({
-    id: order.id,
-    storeId: order.store_id,
-    customer: {
-      fullName: order.customer_name,
-      email: order.customer_email,
-      phone: order.customer_phone,
-      address: order.shipping_address,
-      city: order.city,
-      postalCode: order.postal_code,
-    },
-    items: (order.order_items || []).map((item: DatabaseOrderItem) => ({
-      productId: item.product_id,
-      name: item.product_name,
-      price: typeof item.price === "number" ? item.price.toFixed(2) : String(item.price ?? 0),
-      quantity: item.quantity,
-    })),
-    subtotal: order.subtotal,
-    shipping: order.shipping,
-    total: order.total,
-    status: order.status,
-    createdAt: order.created_at,
-  }))
+    const json = (await res.json()) as { orders?: Order[] }
+    if (!json.orders) {
+      return []
+    }
+
+    // The route already scopes by store; this guards against a stale response
+    // for a previously selected store ever leaking into the current view.
+    return json.orders.filter((order) => order.storeId === storeId)
+  } catch {
+    return []
+  }
 }

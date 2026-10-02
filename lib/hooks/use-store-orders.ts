@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { createClient } from "@/lib/supabase/client"
-import { fetchOrdersFromSupabase, Order } from "@/lib/data/orders"
+import { fetchOrdersForStore, Order } from "@/lib/data/orders"
 import { REALTIME_LISTEN_TYPES, REALTIME_POSTGRES_CHANGES_LISTEN_EVENT } from "@supabase/supabase-js"
 
 interface OrderStats {
@@ -24,43 +24,46 @@ interface UseStoreOrdersResult {
 /**
  * useStoreOrders
  *
- * Single source of truth for the admin's own orders across the dashboard,
- * orders page, revenue page, etc.
+ * Single source of truth for the orders shown across the dashboard, revenue
+ * page, orders page, etc.
  *
- * It:
- *  1. Loads orders scoped to the logged-in user (RLS also enforces this).
- *  2. Subscribes to realtime INSERT/UPDATE/DELETE events on public.orders
- *     and refreshes automatically. The subscription is filtered to the
- *     current user_id so other users' events are never delivered.
+ * It is driven by the *selected store ID*, never by the signed-in user, so
+ * switching stores switches the revenue/order context without touching the
+ * auth session. It:
+ *  1. Loads orders scoped to the selected store via the store-scoped server
+ *     route (the browser client cannot read another store's orders).
+ *  2. Subscribes to realtime INSERT/UPDATE/DELETE events on public.orders and
+ *     refreshes automatically. The subscription is filtered to the selected
+ *     store so another store's events are never delivered.
  *  3. Cleans up the subscription on unmount so there are no duplicates
  *     or leaks.
  *  4. Returns derived statistics (revenue, counts by status).
  */
-export function useStoreOrders(userId: string | null | undefined): UseStoreOrdersResult {
+export function useStoreOrders(storeId: string | null | undefined): UseStoreOrdersResult {
   const [orders, setOrders] = React.useState<Order[]>([])
   const [loading, setLoading] = React.useState(true)
 
   const refresh = React.useCallback(async () => {
-    if (!userId) {
+    if (!storeId) {
       setOrders([])
       setLoading(false)
       return
     }
-    const data = await fetchOrdersFromSupabase(userId)
+    const data = await fetchOrdersForStore(storeId)
     setOrders(data)
     setLoading(false)
-  }, [userId])
+  }, [storeId])
 
   /* eslint-disable react-hooks/set-state-in-effect */
   React.useEffect(() => {
-    if (!userId) {
+    if (!storeId) {
       setOrders([])
       setLoading(false)
       return
     }
     let cancelledInner = false
     setLoading(true)
-    fetchOrdersFromSupabase(userId).then((data) => {
+    fetchOrdersForStore(storeId).then((data) => {
       if (!cancelledInner) {
         setOrders(data)
         setLoading(false)
@@ -69,22 +72,22 @@ export function useStoreOrders(userId: string | null | undefined): UseStoreOrder
     return () => {
       cancelledInner = true
     }
-  }, [userId])
+  }, [storeId])
   /* eslint-enable react-hooks/set-state-in-effect */
 
   React.useEffect(() => {
-    if (!userId) return
+    if (!storeId) return
 
     const supabase = createClient()
     const channel = supabase
-      .channel(`orders:${userId}`)
+      .channel(`orders:${storeId}`)
       .on(
         REALTIME_LISTEN_TYPES.POSTGRES_CHANGES,
         {
           event: REALTIME_POSTGRES_CHANGES_LISTEN_EVENT.ALL,
           schema: "public",
           table: "orders",
-          filter: `user_id=eq.${userId}`,
+          filter: `store_id=eq.${storeId}`,
         },
         () => {
           void refresh()
@@ -95,7 +98,7 @@ export function useStoreOrders(userId: string | null | undefined): UseStoreOrder
     return () => {
       void supabase.removeChannel(channel)
     }
-  }, [userId, refresh])
+  }, [storeId, refresh])
 
   const stats = React.useMemo<OrderStats>(() => {
     const completed = orders.filter((o) => o.status === "Completed").length

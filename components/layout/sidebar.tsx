@@ -2,8 +2,9 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
+import { useStores } from "@/lib/stores-context"
 import { cn } from "../ui/button"
 import { Button } from "../ui/button"
 import { Logo } from "../ui/logo"
@@ -20,6 +21,7 @@ import {
   HelpCircle,
   ChevronLeft,
   ChevronRight,
+  Check,
   X,
 } from "lucide-react"
 
@@ -48,6 +50,24 @@ function SidebarInner({ className }: SidebarProps) {
   // compact sidebar spacing
   const [collapsed, setCollapsed] = React.useState(false)
   const pathname = usePathname()
+  const router = useRouter()
+  const { stores, activeStoreId, setActiveStoreId, loading: storesLoading } = useStores()
+
+  /**
+   * Selecting a store switches the *dashboard* workspace, it never navigates
+   * to the public `/store/<slug>` storefront. The id is persisted by
+   * `setActiveStoreId` (lib/stores-context), and every dashboard page reads it
+   * from there, so the whole workspace (products, orders, revenue, AI insights)
+   * follows the selection. Dashboard URLs stay unchanged.
+   */
+  const handleSelectStore = React.useCallback(
+    (storeId: string) => {
+      if (!storeId) return
+      setActiveStoreId(storeId)
+      router.push("/dashboard")
+    },
+    [router, setActiveStoreId]
+  )
 
   return (
     <aside
@@ -74,6 +94,49 @@ function SidebarInner({ className }: SidebarProps) {
       </div>
 
       <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-2">
+        <div className="space-y-1">
+          {storesLoading ? (
+            !collapsed && <p className="px-3 pb-2 text-xs text-muted-foreground">Loading stores...</p>
+          ) : stores.length > 1 ? (
+            <div className="mb-4">
+              {!collapsed && (
+                <p className="px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+                  Your Stores
+                </p>
+              )}
+              <div className="space-y-1">
+                {stores.map((store) => {
+                  const isActive = store.id === activeStoreId
+                  return (
+                    <button
+                      key={store.id}
+                      type="button"
+                      onClick={() => handleSelectStore(store.id)}
+                      aria-current={isActive ? "true" : undefined}
+                      title={collapsed ? store.name : undefined}
+                      className={cn(
+                        "flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-all duration-200 text-left",
+                        isActive
+                          ? "bg-border-light text-foreground"
+                          : "text-muted-foreground hover:bg-border-light hover:text-foreground",
+                        collapsed && "justify-center px-2"
+                      )}
+                    >
+                      <Store className="h-4 w-4 shrink-0" />
+                      {!collapsed && (
+                        <>
+                          <span className="flex-1 truncate">{store.name}</span>
+                          {isActive && <Check className="h-4 w-4 shrink-0 text-accent" />}
+                        </>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          ) : null}
+        </div>
+
         <div className="space-y-1">
           {navItems.map((item) => {
             const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href))

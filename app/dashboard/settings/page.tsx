@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useAuth } from "@/components/providers/auth-provider"
-import { upsertProfile, updatePasswordWithCurrent, updateEmail, signOut } from "@/lib/supabase/auth"
+import { upsertProfile, updatePasswordWithCurrent, signOut } from "@/lib/supabase/auth"
 
 export default function SettingsPage() {
   const { user, profile, refreshProfile } = useAuth()
@@ -21,7 +21,6 @@ export default function SettingsPage() {
   
   const [profileLoading, setProfileLoading] = React.useState(false)
   const [passwordLoading, setPasswordLoading] = React.useState(false)
-  const [emailLoading, setEmailLoading] = React.useState(false)
   const [message, setMessage] = React.useState<{ type: "success" | "error"; text: string } | null>(null)
 
   /* eslint-disable react-hooks/set-state-in-effect */
@@ -76,20 +75,6 @@ export default function SettingsPage() {
       setMessage({ type: "error", text: err instanceof Error ? err.message : "Failed to update password" })
     } finally {
       setPasswordLoading(false)
-    }
-  }
-
-  const handleEmailUpdate = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setEmailLoading(true)
-    setMessage(null)
-    try {
-      await updateEmail(email)
-      setMessage({ type: "success", text: "Email update confirmation sent. Please check your inbox." })
-    } catch (err) {
-      setMessage({ type: "error", text: err instanceof Error ? err.message : "Failed to update email" })
-    } finally {
-      setEmailLoading(false)
     }
   }
 
@@ -152,21 +137,28 @@ export default function SettingsPage() {
                 <CardTitle>Account Email</CardTitle>
               </CardHeader>
               <CardContent>
-                <form onSubmit={handleEmailUpdate} className="space-y-4">
+                <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium mb-1.5">Email Address</label>
                     <Input
                       type="email"
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="you@example.com"
+                      readOnly
+                      disabled
+                      className="bg-border-light"
                     />
-                    <p className="text-xs text-muted-foreground mt-1">Changing your email will require verification.</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      This email is tied to your authenticated account and cannot be changed here.
+                    </p>
                   </div>
-                  <Button type="submit" disabled={emailLoading}>
-                    {emailLoading ? "Updating..." : "Update Email"}
-                  </Button>
-                </form>
+                  <div className="rounded-xl border border-border bg-surface p-4">
+                    <p className="text-sm font-medium mb-1">Switch accounts</p>
+                    <p className="text-xs text-muted-foreground mb-3">
+                      To switch to a different account, log out and sign in with that account&apos;s email and password. Changing your email does not switch accounts.
+                    </p>
+                    <Button variant="secondary" onClick={handleLogout}>Log out</Button>
+                  </div>
+                </div>
               </CardContent>
             </Card>
 

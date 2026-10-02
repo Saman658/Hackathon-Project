@@ -1,9 +1,18 @@
 import { createClient } from './client'
 
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error('Auth timeout')), ms)
+    ),
+  ])
+}
+
 export async function getCurrentUser() {
   const supabase = createClient()
   try {
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { user } } = await withTimeout(supabase.auth.getUser(), 5000)
     return user
   } catch {
     return null
@@ -12,7 +21,7 @@ export async function getCurrentUser() {
 
 export async function getProfile() {
   const supabase = createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await withTimeout(supabase.auth.getUser(), 5000)
   
   if (!user) return null
   
@@ -28,7 +37,7 @@ export async function getProfile() {
 
 export async function upsertProfile(profile: { name?: string; business_name?: string; email?: string }) {
   const supabase = createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await withTimeout(supabase.auth.getUser(), 5000)
   
   if (!user) throw new Error('Not authenticated')
   
@@ -36,8 +45,7 @@ export async function upsertProfile(profile: { name?: string; business_name?: st
     .from('profiles')
     .upsert({ 
       id: user.id, 
-      ...profile,
-      email: user.email 
+      ...profile
     })
     .select()
     .single()
@@ -55,7 +63,7 @@ export async function updatePassword(newPassword: string) {
 export async function updatePasswordWithCurrent(currentPassword: string, newPassword: string) {
   const supabase = createClient()
   
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await withTimeout(supabase.auth.getUser(), 5000)
   if (!user) throw new Error('Not authenticated')
   
   const { error: verifyError } = await supabase.auth.signInWithPassword({
@@ -73,6 +81,10 @@ export async function updatePasswordWithCurrent(currentPassword: string, newPass
 
 export async function updateEmail(newEmail: string) {
   const supabase = createClient()
+  const { data: { user } } = await withTimeout(supabase.auth.getUser(), 5000)
+  
+  if (!user) throw new Error('Not authenticated')
+  
   const { error } = await supabase.auth.updateUser({ email: newEmail })
   if (error) throw error
 }

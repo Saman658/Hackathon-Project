@@ -32,7 +32,7 @@ export default function ProductDetailPage() {
   const params = useParams()
   const router = useRouter()
   const slug = params.slug as string
-  const productId = params.id as string
+  const productSlug = params.id as string
   const { addToCart, items } = useCart()
 
   const [data, setData] = React.useState<ProductData | null>(null)
@@ -46,7 +46,7 @@ export default function ProductDetailPage() {
   React.useEffect(() => {
     async function load() {
       try {
-        const res = await fetch(`/api/store/products/${productId}?storeSlug=${encodeURIComponent(slug)}`, { cache: "no-store" })
+        const res = await fetch(`/api/store/products/${encodeURIComponent(productSlug)}?storeSlug=${encodeURIComponent(slug)}`, { cache: "no-store" })
         if (!res.ok) {
           if (res.status === 404) {
             notFound()
@@ -69,7 +69,7 @@ export default function ProductDetailPage() {
       }
     }
     load()
-  }, [productId, slug])
+  }, [productSlug, slug])
 
   if (loading) {
     return (

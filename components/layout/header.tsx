@@ -19,7 +19,9 @@ import {
 } from "lucide-react"
 import { Sidebar } from "./sidebar"
 import { useAuth } from "@/components/providers/auth-provider"
+import { useStores } from "@/lib/stores-context"
 import { ProfileModal } from "@/components/auth/profile-modal"
+import { Store as StoreIcon } from "lucide-react"
 
 const notifications = [
   { id: 1, title: "New order received", time: "2 min ago", read: false },
@@ -39,6 +41,9 @@ function HeaderInner({ className }: HeaderProps) {
   const router = useRouter()
   const unreadCount = notifications.filter((n) => !n.read).length
   const { user, profile, signOut, refreshProfile } = useAuth()
+  // The store the whole dashboard is currently scoped to. Shown so it is always
+  // obvious whether the workspace is operating on Sehrish, Mahrukh, etc.
+  const { activeStore } = useStores()
 
   const getPageTitle = () => {
     if (pathname === "/dashboard") return "Dashboard"
@@ -83,6 +88,12 @@ function HeaderInner({ className }: HeaderProps) {
             <Menu className="h-5 w-5" />
           </Button>
           <h1 className="text-xl font-semibold tracking-tight">{getPageTitle()}</h1>
+          {activeStore && (
+            <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-border bg-border-light px-3 py-1 text-xs font-medium text-foreground">
+              <StoreIcon className="h-3.5 w-3.5 text-accent" />
+              <span className="max-w-[180px] truncate">{activeStore.name}</span>
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-2">

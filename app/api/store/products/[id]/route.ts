@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/service"
-import { toProduct } from "@/lib/data/products"
+import { toProduct, toSlug } from "@/lib/data/products"
+import type { DatabaseProduct } from "@/lib/data/products"
 
 export const dynamic = "force-dynamic"
 
@@ -8,34 +9,56 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params
+  const { id: productSlug } = await params
   const url = new URL(request.url)
   const storeSlug = url.searchParams.get("storeSlug")
-  const supabase = createServiceClient()
 
-  const { data: product, error: productError } = await supabase
-    .from("products")
-    .select("*")
-    .eq("id", id)
-    .eq("status", "Active")
-    .single()
-
-  if (productError || !product) {
-    return NextResponse.json({ error: "Product not found" }, { status: 404 })
+  if (!storeSlug) {
+    return NextResponse.json({ error: "Store slug required" }, { status: 404 })
   }
+
+  const supabase = createServiceClient()
 
   const { data: store, error: storeError } = await supabase
     .from("stores")
     .select("*")
-    .eq("id", product.store_id)
+    .eq("slug", storeSlug)
     .single()
 
   if (storeError || !store) {
     return NextResponse.json({ error: "Store not found" }, { status: 404 })
   }
 
-  if (storeSlug && store.slug !== storeSlug) {
-    return NextResponse.json({ error: "Product not found in store" }, { status: 404 })
+  let product: DatabaseProduct | null = null
+  let productError: { code?: string; message?: string } | null = null
+
+  const { data: productBySlug, error: slugError } = await supabase
+    .from("products")
+    .select("id, user_id, store_id, name, description, price, stock, image_url, status, sku, category, created_at, updated_at")
+    .eq("slug", productSlug)
+    .eq("store_id", store.id)
+    .eq("status", "Active")
+    .single()
+
+  if (!slugError && productBySlug) {
+    product = productBySlug as DatabaseProduct
+  } else if (slugError && slugError.code === "42703") {
+    const { data: products, error: productsError } = await supabase
+      .from("products")
+      .select("id, user_id, store_id, name, description, price, stock, image_url, status, sku, category, created_at, updated_at")
+      .eq("store_id", store.id)
+      .eq("status", "Active")
+
+    if (!productsError && products) {
+      product = (products.find((p) => toSlug(p.name) === productSlug) as DatabaseProduct) || null
+    }
+    productError = productsError
+  } else {
+    productError = slugError
+  }
+
+  if (productError || !product) {
+    return NextResponse.json({ error: "Product not found" }, { status: 404 })
   }
 
   return NextResponse.json({

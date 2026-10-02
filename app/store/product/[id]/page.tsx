@@ -30,7 +30,7 @@ interface ProductData {
 export default function ProductDetailPage() {
   const params = useParams()
   const router = useRouter()
-  const productId = params.id as string
+  const productSlug = params.id as string
   const { addToCart } = useCart()
 
   const [data, setData] = React.useState<ProductData | null>(null)
@@ -39,7 +39,18 @@ export default function ProductDetailPage() {
   React.useEffect(() => {
     async function load() {
       try {
-        const res = await fetch(`/api/store/products/${productId}`, { cache: "no-store" })
+        const storeRes = await fetch("/api/store", { cache: "no-store" })
+        if (!storeRes.ok) {
+          setLoading(false)
+          return
+        }
+        const storeJson = await storeRes.json()
+        const slug = storeJson.store?.slug
+        if (!slug) {
+          setLoading(false)
+          return
+        }
+        const res = await fetch(`/api/store/products/${encodeURIComponent(productSlug)}?storeSlug=${encodeURIComponent(slug)}`, { cache: "no-store" })
         if (!res.ok) {
           setLoading(false)
           return
@@ -53,7 +64,7 @@ export default function ProductDetailPage() {
       }
     }
     load()
-  }, [productId])
+  }, [productSlug])
 
   if (loading) {
     return (
@@ -119,7 +130,7 @@ export default function ProductDetailPage() {
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
-                    <Link href={`/store/${store.slug}/product/${product.id}`} className="group">
+                    <Link href={`/store/${store.slug}/product/${product.slug}`} className="group">
                       <CardTitle className="text-2xl group-hover:text-accent transition-colors">{product.name}</CardTitle>
                     </Link>
                     <CardDescription className="mt-1">SKU: {product.sku}</CardDescription>

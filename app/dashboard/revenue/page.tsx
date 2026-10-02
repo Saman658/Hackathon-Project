@@ -5,7 +5,7 @@ import { Sidebar } from "@/components/layout/sidebar"
 import { Header } from "@/components/layout/header"
 import { AnalyticsCard } from "@/components/dashboard/analytics-card"
 import { ChartPlaceholder } from "@/components/dashboard/chart-placeholder"
-import { useAuth } from "@/components/providers/auth-provider"
+import { useStores } from "@/lib/stores-context"
 import { useStoreOrders } from "@/lib/hooks/use-store-orders"
 import { DollarSign, ShoppingCart, Clock, TrendingUp } from "lucide-react"
 
@@ -14,8 +14,8 @@ function formatCurrency(value: number): string {
 }
 
 export default function RevenuePage() {
-  const { user } = useAuth()
-  const { stats } = useStoreOrders(user?.id)
+  const { activeStoreId } = useStores()
+  const { stats } = useStoreOrders(activeStoreId)
 
   const cards = React.useMemo(
     () => [

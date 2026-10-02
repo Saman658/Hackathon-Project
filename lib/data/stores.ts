@@ -55,7 +55,9 @@ export async function getStoreBySlug(slug: string): Promise<Store | undefined> {
     .from("stores")
     .select("*")
     .eq("slug", slug)
-    .single()
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle()
 
   if (error || !data) return undefined
 

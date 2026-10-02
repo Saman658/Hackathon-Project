@@ -36,7 +36,7 @@ export async function GET() {
 
   const { data: products, error: productsError } = await serviceSupabase
     .from("products")
-    .select("*")
+    .select("id, user_id, store_id, name, description, price, stock, image_url, status, sku, category, created_at, updated_at")
     .eq("store_id", store.id)
     .eq("status", "Active")
     .order("created_at", { ascending: false })

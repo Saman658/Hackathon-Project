@@ -12,7 +12,7 @@ interface StoreHeroProps {
   className?: string
 }
 
-function StoreHeroInner({ store, ctaLabel = "Shop Now", ctaHref = "/store#products", className }: StoreHeroProps) {
+function StoreHeroInner({ store, ctaLabel = "Shop Now", ctaHref = "#products", className }: StoreHeroProps) {
   return (
     <section className={cn("relative overflow-hidden pt-20 pb-16", className)}>
       <div className="absolute inset-0 -z-10">

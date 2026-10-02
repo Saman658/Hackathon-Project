@@ -33,9 +33,9 @@ function formatCurrency(value: number): string {
 
 export default function DashboardPage() {
   const router = useRouter()
-  const { profile, user } = useAuth()
-  const { addStore, updateStore, stores } = useStores()
-  const { orders, stats } = useStoreOrders(user?.id)
+  const { profile } = useAuth()
+  const { addStore, updateStore, activeStore } = useStores()
+  const { orders, stats } = useStoreOrders(activeStore?.id)
   const [modalOpen, setModalOpen] = React.useState(false)
   const [editModalOpen, setEditModalOpen] = React.useState(false)
   const [successStore, setSuccessStore] = React.useState<Store | null>(null)
@@ -277,8 +277,8 @@ export default function DashboardPage() {
                 </p>
               </div>
               <div className="flex items-center gap-3">
-                {stores.length > 0 && (
-                  <Button variant="secondary" onClick={() => handleOpenEdit(stores[0])}>Edit Store</Button>
+                {activeStore && (
+                  <Button variant="secondary" onClick={() => handleOpenEdit(activeStore)}>Edit Store</Button>
                 )}
                 <Button onClick={() => { resetForm(); setModalOpen(true) }}>Create Store</Button>
               </div>

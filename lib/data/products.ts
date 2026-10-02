@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/client"
 
 export interface Product {
   id: string
+  slug: string
   name: string
   sku: string
   price: string
@@ -27,8 +28,18 @@ export interface DatabaseProduct {
   status: string
   sku: string | null
   category?: string | null
+  slug?: string | null
   created_at: string
   updated_at: string
+}
+
+export function toSlug(value: string): string {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, "")
+    .replace(/[\s_-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
 }
 
 export function parseStock(value: string | number | undefined | null): number {
@@ -58,6 +69,7 @@ export function isSuitProduct(product: { name?: string; category?: string }): bo
 export function toProduct(db: DatabaseProduct): Product {
   return {
     id: db.id,
+    slug: db.slug || toSlug(db.name),
     name: db.name,
     sku: db.sku || `PROD-${db.id.slice(-6)}`,
     price: `$${db.price.toFixed(2)}`,
@@ -85,7 +97,7 @@ export function toDatabaseProduct(product: Partial<Product> & { user_id: string;
     throw new Error("store_id is required when saving a product — cannot fall back to user_id")
   }
 
-  return {
+    return {
     user_id: product.user_id,
     store_id: product.store_id,
     name: product.name || "",
@@ -96,22 +108,20 @@ export function toDatabaseProduct(product: Partial<Product> & { user_id: string;
     status: product.status || "Draft",
     sku: product.sku || null,
     category: product.category || null,
+    slug: product.slug || toSlug(product.name || 'product') || 'product',
   }
 }
 
-export async function fetchProductsFromSupabase(userId?: string, storeId?: string): Promise<Product[]> {
+export async function fetchProductsFromSupabase(_userId?: string, storeId?: string): Promise<Product[]> {
+  if (!storeId) {
+    return []
+  }
+
   const supabase = createClient()
-  let query = supabase.from("products").select("id, user_id, store_id, name, description, price, stock, image_url, status, sku, category, created_at, updated_at")
-
-  if (userId) {
-    query = query.eq("user_id", userId)
-  }
-
-  if (storeId) {
-    query = query.eq("store_id", storeId)
-  }
-
-  const { data, error } = await query
+  const { data, error } = await supabase
+    .from("products")
+    .select("id, user_id, store_id, name, description, price, stock, image_url, status, sku, category, slug, created_at, updated_at")
+    .eq("store_id", storeId)
 
   if (error || !data || data.length === 0) {
     return []

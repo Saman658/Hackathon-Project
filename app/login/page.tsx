@@ -2,16 +2,29 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [email, setEmail] = React.useState("")
   const [password, setPassword] = React.useState("")
   const [loading, setLoading] = React.useState(false)
-  const [error, setError] = React.useState("")
+  const [error, setError] = React.useState(() => {
+    const callbackError = searchParams?.get("error")
+    if (callbackError) {
+      if (callbackError === "auth_callback_failed") {
+        return "Authentication failed. Please try again."
+      } else if (callbackError === "no_session") {
+        return "No session was created. Please try again."
+      }
+      return callbackError
+    }
+    return ""
+  })
   const [oauthLoading, setOauthLoading] = React.useState(false)
 
   const supabase = createClient()
@@ -49,11 +62,11 @@ export default function LoginPage() {
       })
       if (error) {
         setError(error.message)
-        setOauthLoading(false)
       }
     } catch (err) {
       console.error("Google OAuth exception:", err)
       setError(err instanceof Error ? err.message : "An unexpected error occurred")
+    } finally {
       setOauthLoading(false)
     }
   }
@@ -70,11 +83,11 @@ export default function LoginPage() {
       })
       if (error) {
         setError(error.message)
-        setOauthLoading(false)
       }
     } catch (err) {
       console.error("GitHub OAuth exception:", err)
       setError(err instanceof Error ? err.message : "An unexpected error occurred")
+    } finally {
       setOauthLoading(false)
     }
   }
@@ -152,5 +165,13 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <React.Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
+      <LoginForm />
+    </React.Suspense>
   )
 }

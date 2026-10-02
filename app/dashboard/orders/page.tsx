@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { useAuth } from "@/components/providers/auth-provider"
+import { useStores } from "@/lib/stores-context"
 import { Order } from "@/lib/data/orders"
 import { useStoreOrders } from "@/lib/hooks/use-store-orders"
 
@@ -103,8 +103,8 @@ function buildCsv(fullOrders: Order[]): string {
 }
 
 export default function OrdersPage() {
-  const { user } = useAuth()
-  const { orders, stats } = useStoreOrders(user?.id)
+  const { activeStoreId } = useStores()
+  const { orders, stats } = useStoreOrders(activeStoreId)
   const [exporting, setExporting] = React.useState(false)
   const [message, setMessage] = React.useState<{ type: "success" | "error" | "info"; text: string } | null>(null)
 
